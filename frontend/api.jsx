@@ -307,7 +307,7 @@ export const checkDuplicates = (items) =>
 
 // Mirrors backend _SOURCE_PRIORITY — lower index = higher trust.
 const _SOURCE_PRIORITY = [
-  'novelupdates', 'vndb', 'jikan', 'tmdb', 'igdb',
+  'novelupdates', 'vndb', 'mal', 'tmdb', 'igdb',
   'anilist', 'kitsu', 'mangadex', 'mangaupdates',
   'google_books', 'open_library', 'comicvine', 'rawg',
 ];

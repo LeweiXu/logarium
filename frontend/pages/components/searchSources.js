@@ -5,7 +5,7 @@ export const SEARCH_SOURCES = [
   { value: 'imdb',         label: 'IMDb' },
   { value: 'tmdb',         label: 'TMDB' },
   { value: 'anilist',      label: 'AniList' },
-  { value: 'jikan',        label: 'MyAnimeList' },
+  { value: 'mal',          label: 'MyAnimeList' },
   { value: 'kitsu',        label: 'Kitsu' },
   { value: 'novelupdates', label: 'NovelUpdates' },
   { value: 'mangadex',     label: 'MangaDex' },
@@ -24,13 +24,23 @@ export const SOURCE_LABEL = {
   // URL-only sources (not keyword-searchable, so not in SEARCH_SOURCES)
   jjwxc:  'JJWXC',
   qidian: 'Qidian',
+  // Retired name for MyAnimeList, still on entries saved before the switch off
+  // the Jikan proxy (and on results from an extension older than that switch).
+  jikan:  'MyAnimeList',
 };
+
+// Old source key -> current one. Applied to the saved available-sources set so
+// the switch doesn't silently drop MyAnimeList out of a user's pickers.
+export const LEGACY_SOURCE_ALIASES = { jikan: 'mal' };
+
+/** Current key for a possibly-retired source name. */
+export const canonicalSource = (value) => LEGACY_SOURCE_ALIASES[value] || value;
 
 export const SOURCE_MEDIUMS = {
   imdb:         ['Film', 'TV Show'],
   tmdb:         ['Film', 'TV Show'],
   anilist:      ['Anime', 'Manga', 'Light Novel'],
-  jikan:        ['Anime', 'Manga', 'Light Novel'],
+  mal:          ['Anime', 'Manga', 'Light Novel'],
   kitsu:        ['Anime', 'Manga'],
   novelupdates: ['Light Novel', 'Web Novel'],
   mangadex:     ['Manga', 'Comic'],
@@ -47,9 +57,9 @@ export const SOURCE_MEDIUMS = {
 export const DEFAULT_SOURCES_BY_MEDIUM = {
   Film:           ['imdb'],
   'TV Show':     ['imdb'],
-  Anime:          ['jikan'],
-  Manga:          ['jikan', 'mangaupdates'],
-  'Light Novel':  ['jikan'],
+  Anime:          ['mal'],
+  Manga:          ['mal', 'mangaupdates'],
+  'Light Novel':  ['mal'],
   'Web Novel':    ['novelupdates'],
   Book:           ['goodreads'],
   Comic:          ['comicvine'],
@@ -60,14 +70,14 @@ export const DEFAULT_SOURCES_BY_MEDIUM = {
 // Curated sitewide default for which sources are *available* to search: roughly
 // one provider per medium so the Add/Explore pickers don't offer overlapping
 // sources that return the same titles (e.g. AniList vs MyAnimeList for anime).
-// MyAnimeList (jikan) covers anime, manga, and light novels, with MangaUpdates kept as a manga
+// MyAnimeList covers anime, manga, and light novels, with MangaUpdates kept as a manga
 // backup; IMDb covers film/TV (authoritative ratings + episode counts);
 // NovelUpdates covers web novels; Goodreads covers books (richer metadata +
 // reliable ratings than Google Books). Users edit the available set in
 // Console → Search Sources.
 export const DEFAULT_SOURCES = [
   'imdb',         // film, tv
-  'jikan',        // anime, manga, light novel (MyAnimeList)
+  'mal',          // anime, manga, light novel (MyAnimeList)
   'mangaupdates', // manga backup
   'novelupdates', // web novel
   'rawg',         // game
@@ -85,7 +95,7 @@ export function loadAvailableSources() {
     const raw = localStorage.getItem(LS_AVAILABLE_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      if (Array.isArray(arr)) return new Set(arr.map(canonicalSource));
     }
   } catch (_) { /* ignore */ }
   return new Set(DEFAULT_SOURCES);

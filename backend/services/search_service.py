@@ -11,7 +11,7 @@ Source → Provider mapping:
   imdb          → IMDb (Film & TV — default)
   tmdb          → TMDB (Film & TV)
   anilist       → AniList (Anime & Manga)
-  jikan         → MyAnimeList via Jikan (Anime, Manga, Light Novel default)
+  mal           → MyAnimeList official API (Anime, Manga, Light Novel default)
   kitsu         → Kitsu (Anime & Manga)
   novelupdates  → NovelUpdates (Web Novel, Light Novel)
   mangadex      → MangaDex (Manga, Comic)
@@ -31,7 +31,7 @@ Keys required (all optional — provider is skipped if absent):
   COMICVINE_API_KEY
 
 No-key providers (always active):
-  AniList, Jikan (MAL proxy), MangaDex, Kitsu, Open Library, VNDB, Goodreads
+  AniList, MyAnimeList, MangaDex, Kitsu, Open Library, VNDB, Goodreads
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ from schemas import SearchResult
 from services.search_providers import (
     search_tmdb,
     search_anilist,
-    search_jikan,
+    search_mal,
     search_kitsu,
     search_mangadex,
     search_igdb,
@@ -68,13 +68,13 @@ logger = logging.getLogger(__name__)
 # Provider preference order when two results look like duplicates.
 # Lower index = higher trust for cover quality / metadata completeness.
 _SOURCE_PRIORITY = [
-    "jikan",        # MAL data — preferred over AniList for anime & manga
+    "mal",          # MAL data, preferred over AniList for anime & manga
     "novelupdates", # best web novel metadata, highly curated
     "vndb",         # best visual novel metadata, highly curated
     "imdb",         # best film/TV metadata + authoritative ratings
     "tmdb",         # film/TV fallback (covers, overviews)
     "igdb",         # best game metadata
-    "anilist",      # good anime/manga, lower priority than Jikan/MangaUpdates
+    "anilist",      # good anime/manga, lower priority than MAL/MangaUpdates
     "kitsu",        # decent fallback for anime/manga
     "mangadex",     # great for manga, cover quality varies
     "mangaupdates", # best manga metadata, highly curated
@@ -146,7 +146,7 @@ _ALL_PROVIDERS = [
     search_tmdb,
     search_imdb,
     search_anilist,
-    search_jikan,
+    search_mal,
     search_kitsu,
     search_novelupdates,
     search_mangaupdates,
@@ -164,7 +164,7 @@ _SOURCE_TO_PROVIDER = {
     "tmdb":         search_tmdb,
     "imdb":         search_imdb,
     "anilist":      search_anilist,
-    "jikan":        search_jikan,
+    "mal":          search_mal,
     "kitsu":        search_kitsu,
     "novelupdates": search_novelupdates,
     "mangadex":     search_mangadex,
@@ -182,9 +182,9 @@ _SOURCE_TO_PROVIDER = {
 _MEDIUM_PROVIDERS: dict[str, list] = {
     "Film":         [search_imdb, search_tmdb],
     "TV Show":      [search_imdb, search_tmdb],
-    "Anime":        [search_jikan, search_anilist, search_kitsu],
-    "Manga":        [search_jikan, search_anilist, search_mangadex, search_mangaupdates],
-    "Light Novel":  [search_jikan, search_novelupdates, search_anilist, search_google_books, search_open_library],
+    "Anime":        [search_mal, search_anilist, search_kitsu],
+    "Manga":        [search_mal, search_anilist, search_mangadex, search_mangaupdates],
+    "Light Novel":  [search_mal, search_novelupdates, search_anilist, search_google_books, search_open_library],
     "Web Novel":    [search_novelupdates, search_google_books, search_open_library],
     "Book":         [search_goodreads, search_google_books, search_open_library],
     "Game":         [search_igdb, search_rawg],
@@ -230,7 +230,7 @@ async def search_media(
 async def lookup_chapter_count(title: str) -> int | None:
     """Latest translated chapter count for a title via MangaUpdates.
 
-    Used on demand (when a user adds an ongoing MAL/Jikan manga that has no
+    Used on demand (when a user adds an ongoing MAL manga that has no
     chapter total) rather than during every search, to avoid the extra API
     round-trips on results the user never adds.
     """

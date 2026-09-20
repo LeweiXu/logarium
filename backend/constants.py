@@ -100,7 +100,7 @@ def normalise_origin(raw: str | None) -> str | None:
 SOURCE_URL_MAP: dict[str, str] = {
     "themoviedb.org":         "tmdb",
     "anilist.co":             "anilist",
-    "myanimelist.net":        "jikan",
+    "myanimelist.net":        "mal",
     "kitsu.io":               "kitsu",
     "novelupdates.com":       "novelupdates",
     "mangadex.org":           "mangadex",
@@ -114,7 +114,12 @@ SOURCE_URL_MAP: dict[str, str] = {
     "vndb.org":               "vndb",
 }
 
-VALID_SOURCES: frozenset[str] = frozenset(SOURCE_URL_MAP.values())
+# "jikan" is the retired name for the MyAnimeList source (the Jikan proxy MAL
+# cut off). Entries saved before the switch still carry it, and so does the
+# browser extension until its next release, so it stays valid here.
+LEGACY_SOURCES: dict[str, str] = {"jikan": "mal"}
+
+VALID_SOURCES: frozenset[str] = frozenset(SOURCE_URL_MAP.values()) | frozenset(LEGACY_SOURCES)
 
 
 def infer_source_from_url(url: str | None) -> str | None:

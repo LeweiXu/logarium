@@ -125,7 +125,7 @@ logarium/
 │           ├── tmdb.py
 │           ├── imdb.py
 │           ├── anilist.py
-│           ├── jikan.py
+│           ├── mal.py
 │           ├── kitsu.py
 │           ├── mangadex.py
 │           ├── mangaupdates.py
@@ -817,7 +817,7 @@ Backend keyword-search providers currently registered in
 - `tmdb`
 - `imdb`
 - `anilist`
-- `jikan`
+- `mal`
 - `kitsu`
 - `mangadex`
 - `mangaupdates`
@@ -842,7 +842,7 @@ includes URL-only labels:
 Default available sources are curated to reduce overlapping duplicates:
 
 - `imdb`
-- `jikan` (default for anime, manga, and light novels)
+- `mal` (default for anime, manga, and light novels)
 - `mangaupdates`
 - `novelupdates` (default for web novels)
 - `rawg`
@@ -863,9 +863,9 @@ Console settings.
 Per-medium source defaults:
 
 - Film and TV Show: `imdb`
-- Anime: `jikan`
-- Manga: `jikan`, with `mangaupdates` as a backup
-- Light Novel: `jikan`
+- Anime: `mal`
+- Manga: `mal`, with `mangaupdates` as a backup
+- Light Novel: `mal`
 - Web Novel: `novelupdates`
 - Book: `goodreads`
 - Comic: `comicvine`
@@ -879,7 +879,9 @@ recognized domains include:
 
 - `themoviedb.org` -> `tmdb`
 - `anilist.co` -> `anilist`
-- `myanimelist.net` -> `jikan`
+- `myanimelist.net` -> `mal` (the retired `jikan` value stays valid: entries
+  saved before the switch carry it, and so does the browser extension until its
+  next release; the frontend maps it through `canonicalSource()`)
 - `kitsu.io` -> `kitsu`
 - `novelupdates.com` -> `novelupdates`
 - `mangadex.org` -> `mangadex`

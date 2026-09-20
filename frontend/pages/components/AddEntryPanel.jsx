@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { searchMedia, fetchByUrl, checkDuplicates, findEntryByUrl } from '../../api.jsx';
 import { isUrl, inferSourceFromUrl, URL_SCRAPE_SOURCES, statusLabel, onCoverError, mediumIsVisible, visibleMediumSetFromPrefs } from '../../utils.jsx';
-import { SEARCH_SOURCES, SOURCE_LABEL, resultToEntry, loadAvailableSources } from './searchSources.js';
+import { SEARCH_SOURCES, SOURCE_LABEL, canonicalSource, resultToEntry, loadAvailableSources } from './searchSources.js';
 import AddEntryModal from './AddEntryModal.jsx';
 import ExtensionInstallHint from './ExtensionInstallHint.jsx';
 import {
@@ -52,7 +52,7 @@ export default function AddEntryPanel({
   const availableList = useMemo(() => SEARCH_SOURCES.filter(s => availableSet.has(s.value)), [availableSet]);
 
   const nuRequested = (selectedSources.size === 0 || selectedSources.has('novelupdates')) && availableSet.has('novelupdates');
-  const malRequested = (selectedSources.size === 0 || selectedSources.has('jikan')) && availableSet.has('jikan');
+  const malRequested = (selectedSources.size === 0 || selectedSources.has('mal')) && availableSet.has('mal');
 
   async function runDupCheck(list) {
     if (!list.length) { setInLibrary([]); return; }
@@ -140,9 +140,9 @@ export default function AddEntryPanel({
           const data = await fetchByUrl(q);
           found = Array.isArray(data) ? data : [];
         } catch (error) {
-          if (!(src === 'jikan' && extPresent)) throw error;
+          if (!(src === 'mal' && extPresent)) throw error;
         }
-        if (found.length === 0 && src === 'jikan' && extPresent) {
+        if (found.length === 0 && src === 'mal' && extPresent) {
           const scraped = await extensionMalPage(q);
           if (scraped) found = [scraped];
         }
@@ -163,9 +163,9 @@ export default function AddEntryPanel({
       setResults(list);
       await runDupCheck(list);
 
-      // Jikan is the normal MAL source. Only scrape MAL through the extension
-      // when Jikan contributed no results at all.
-      if (malRequested && extPresent && !list.some(item => item.source === 'jikan')) {
+      // The MAL API is the normal source. Only scrape MAL through the extension
+      // when the API contributed no results at all.
+      if (malRequested && extPresent && !list.some(item => canonicalSource(item.source) === 'mal')) {
         setMalSearching(true);
         try {
           const mal = await extensionMalSearch(q);

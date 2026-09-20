@@ -6,6 +6,7 @@ import { extensionNuSeries } from '../../extensionBridge.js';
 import CustomListField from './CustomListField.jsx';
 import CustomSelect from './CustomSelect.jsx';
 import NumberStepper from './NumberStepper.jsx';
+import { canonicalSource } from './searchSources.js';
 
 function toDateInput(iso) {
   if (!iso) return '';
@@ -117,11 +118,11 @@ export default function EntryForm({
   // 'total' = manga chapters / IMDb episodes; 'imdb' also fills the source rating.
   const [fetching, setFetching] = useState('');
 
-  // For a MAL/Jikan manga being added with no chapter total (MAL leaves ongoing
+  // For a MAL manga being added with no chapter total (MAL leaves ongoing
   // series blank), fetch the latest chapter count from MangaUpdates on demand.
   useEffect(() => {
     if (isEdit) return;
-    if (entry?.source !== 'jikan' || entry?.medium !== 'Manga' || entry?.total) return;
+    if (canonicalSource(entry?.source) !== 'mal' || entry?.medium !== 'Manga' || entry?.total) return;
     if (!entry?.title) return;
     let cancelled = false;
     setFetching('total');

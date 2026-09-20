@@ -637,7 +637,7 @@ async def chapter_count(
 ):
     """On-demand MangaUpdates chapter-count lookup for a single title.
 
-    Called when adding an ongoing MAL/Jikan manga whose chapter total is blank.
+    Called when adding an ongoing MAL manga whose chapter total is blank.
     """
     return {"total": await lookup_chapter_count(title)}
 

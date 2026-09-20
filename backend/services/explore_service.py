@@ -47,7 +47,7 @@ from services.search_providers.comicvine import _discover_comicvine
 from services.search_providers.google_books import _discover_google_books
 from services.search_providers.goodreads import _discover_goodreads
 from services.search_providers.igdb import _discover_igdb
-from services.search_providers.jikan import _discover_jikan
+from services.search_providers.mal import _discover_mal
 from services.search_providers.novelupdates import _discover_novelupdates
 from services.search_providers.rawg import _discover_rawg
 from services.search_providers.tmdb import _discover_tmdb
@@ -63,12 +63,12 @@ _MAX_DISCOVERY_PAGES_PER_PROVIDER = 10
 # Display names for the discovery sources, used to build provider-specific
 # reroll error messages (mirrors the frontend SOURCE_LABEL map).
 _SOURCE_LABEL: dict[str, str] = {
-    "tmdb": "TMDB", "imdb": "IMDb", "jikan": "MyAnimeList", "anilist": "AniList",
+    "tmdb": "TMDB", "imdb": "IMDb", "mal": "MyAnimeList", "anilist": "AniList",
     "novelupdates": "NovelUpdates", "comicvine": "ComicVine",
     "google_books": "Google Books", "goodreads": "Goodreads", "rawg": "RAWG",
     "igdb": "IGDB", "vndb": "VNDB",
 }
-_JIKAN_DOWN_MSG = "The MyAnimeList/Jikan API is down. Try again later."
+_MAL_DOWN_MSG = "The MyAnimeList API is down. Try again later."
 
 
 # ── Consumption profile ───────────────────────────────────────────────────────
@@ -180,9 +180,9 @@ def _normalised_weights(counter: Counter[str], top_n: int = 10) -> dict[str, flo
 _PROVIDER_FNS_BY_MEDIUM: dict[str, list] = {
     "Film":         [_discover_imdb, _discover_tmdb],
     "TV Show":      [_discover_imdb, _discover_tmdb],
-    "Anime":        [_discover_jikan, _discover_anilist],
-    "Manga":        [_discover_jikan, _discover_anilist],
-    "Light Novel":  [_discover_jikan, _discover_anilist],
+    "Anime":        [_discover_mal, _discover_anilist],
+    "Manga":        [_discover_mal, _discover_anilist],
+    "Light Novel":  [_discover_mal, _discover_anilist],
     "Web Novel":    [_discover_novelupdates],    # scrapes NU rankings
     "Comic":        [_discover_comicvine],
     "Book":         [_discover_goodreads, _discover_google_books],  # genre-aware; need top_genres
@@ -197,7 +197,7 @@ _PROVIDER_FNS_BY_MEDIUM: dict[str, list] = {
 _DISCOVER_SOURCE: dict = {
     _discover_tmdb:         "tmdb",
     _discover_imdb:         "imdb",
-    _discover_jikan:        "jikan",
+    _discover_mal:          "mal",
     _discover_anilist:      "anilist",
     _discover_novelupdates: "novelupdates",
     _discover_comicvine:    "comicvine",
@@ -262,8 +262,8 @@ def _visible_count(items: list[ExploreItem], owned: set[tuple[str, str]]) -> int
 
 def _down_message(source: str) -> str:
     """The 'provider is down' message for a source."""
-    if source == "jikan":
-        return _JIKAN_DOWN_MSG
+    if source == "mal":
+        return _MAL_DOWN_MSG
     label = _SOURCE_LABEL.get(source, "The source")
     return f"{label} is unavailable right now. Try again later."
 
@@ -274,8 +274,8 @@ def _provider_error_message(fn, exc: Exception) -> str:
     label = _SOURCE_LABEL.get(source, "The source")
     if isinstance(exc, httpx.HTTPStatusError):
         code = exc.response.status_code
-        if fn is _discover_jikan and code in (502, 503, 504):
-            return _JIKAN_DOWN_MSG
+        if fn is _discover_mal and code in (502, 503, 504):
+            return _MAL_DOWN_MSG
         return f"{label} returned an error ({code}). Try again later."
     return f"{label} is unavailable right now. Try again later."
 
@@ -285,7 +285,7 @@ def _provider_error_message(fn, exc: Exception) -> str:
 # from whatever the discovery call happened to raise. A response (even 4xx) means
 # up; a connection error / timeout / 5xx means down.
 _PROVIDER_BASE_URL: dict[str, str] = {
-    "jikan":     "https://api.jikan.moe/v4/",
+    "mal":       "https://api.myanimelist.net/v2/",
     "anilist":   "https://graphql.anilist.co",
     "tmdb":      "https://api.themoviedb.org/3/",
     "rawg":      "https://api.rawg.io/api/",
@@ -340,7 +340,7 @@ async def _discover_medium_capturing(
     """
     combined: list[ExploreItem] = []
     # Keep the first provider's error: providers are tried in priority order, so
-    # the primary source's message (e.g. the Jikan-down message for Anime) wins
+    # the primary source's message (e.g. the MAL-down message for Anime) wins
     # over a fallback provider's later failure.
     first_error: Optional[str] = None
     for fn in _providers_for(medium, allowed_sources):

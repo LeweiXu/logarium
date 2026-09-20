@@ -1,6 +1,6 @@
 from .tmdb import search_tmdb
 from .anilist import search_anilist
-from .jikan import search_jikan
+from .mal import search_mal
 from .kitsu import search_kitsu
 from .mangadex import search_mangadex
 from .igdb import search_igdb
@@ -17,7 +17,7 @@ from .imdb import search_imdb
 __all__ = [
     "search_tmdb",
     "search_anilist",
-    "search_jikan",
+    "search_mal",
     "search_kitsu",
     "search_mangadex",
     "search_igdb",

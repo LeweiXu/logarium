@@ -207,7 +207,7 @@ export function progressLabel(entry) {
 const _SOURCE_DOMAINS = {
   'themoviedb.org':         'tmdb',
   'anilist.co':             'anilist',
-  'myanimelist.net':        'jikan',
+  'myanimelist.net':        'mal',
   'kitsu.io':               'kitsu',
   'kitsu.app':              'kitsu',
   'novelupdates.com':       'novelupdates',
@@ -230,7 +230,7 @@ const _SOURCE_DOMAINS = {
 /** Sources whose pages can be imported by pasting a URL (resolved backend-side). */
 export const URL_SCRAPE_SOURCES = new Set([
   'novelupdates', 'jjwxc', 'qidian', 'imdb', 'goodreads',
-  'tmdb', 'anilist', 'jikan', 'kitsu', 'mangadex', 'mangaupdates',
+  'tmdb', 'anilist', 'mal', 'kitsu', 'mangadex', 'mangaupdates',
   'igdb', 'rawg', 'google_books', 'open_library', 'comicvine', 'vndb',
 ]);
 

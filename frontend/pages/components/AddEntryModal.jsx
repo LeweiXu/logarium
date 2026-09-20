@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { searchMedia, fetchByUrl, checkDuplicates, createEntry } from '../../api.jsx';
 import { isUrl, inferSourceFromUrl, URL_SCRAPE_SOURCES, onCoverError, visibleMediumSetFromPrefs } from '../../utils.jsx';
-import { SEARCH_SOURCES, SOURCE_LABEL, resultToEntry, loadAvailableSources } from './searchSources.js';
+import { SEARCH_SOURCES, SOURCE_LABEL, canonicalSource, resultToEntry, loadAvailableSources } from './searchSources.js';
 import EntryForm, { formToPayload } from './EntryForm.jsx';
 import ConfirmEntryModal from './ConfirmEntryModal.jsx';
 import ExtensionInstallHint from './ExtensionInstallHint.jsx';
@@ -34,7 +34,7 @@ export default function AddEntryModal({ onClose, onCreated, initialEntry = null,
   const availableList = useMemo(() => SEARCH_SOURCES.filter(s => availableSet.has(s.value)), [availableSet]);
 
   const nuRequested = (selectedSources.size === 0 || selectedSources.has('novelupdates')) && availableSet.has('novelupdates');
-  const malRequested = (selectedSources.size === 0 || selectedSources.has('jikan')) && availableSet.has('jikan');
+  const malRequested = (selectedSources.size === 0 || selectedSources.has('mal')) && availableSet.has('mal');
 
   async function runDupCheck(list) {
     if (!list.length) { setInLibrary([]); return; }
@@ -72,9 +72,9 @@ export default function AddEntryModal({ onClose, onCreated, initialEntry = null,
           const data = await fetchByUrl(query.trim());
           raw = Array.isArray(data) ? data : [];
         } catch (error) {
-          if (!(src === 'jikan' && extPresent)) throw error;
+          if (!(src === 'mal' && extPresent)) throw error;
         }
-        if (raw.length === 0 && src === 'jikan' && extPresent) {
+        if (raw.length === 0 && src === 'mal' && extPresent) {
           const scraped = await extensionMalPage(query.trim());
           if (scraped) raw = [scraped];
         }
@@ -97,7 +97,7 @@ export default function AddEntryModal({ onClose, onCreated, initialEntry = null,
 
       // Jikan stays primary. A first-party MAL scrape runs only when the API
       // returned no MAL results.
-      if (malRequested && extPresent && !list.some(item => item.source === 'jikan')) {
+      if (malRequested && extPresent && !list.some(item => canonicalSource(item.source) === 'mal')) {
         setMalSearching(true);
         try {
           const mal = await extensionMalSearch(query.trim());

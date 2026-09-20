@@ -3,7 +3,7 @@ Import entries from a MyAnimeList XML export file.
 
 Flow:
   1. Parse the XML (anime and/or manga elements).
-  2. For each entry, look up metadata from Jikan using the MAL ID directly.
+  2. For each entry, look up metadata from the MAL API using the MAL ID directly.
   3. Soft-match (>=0.99 title similarity) against the user's existing DB entries.
      - No match  → create entry immediately, yield log event.
      - Match      → collect as a conflict, yield log event.
@@ -24,10 +24,17 @@ import httpx
 from sqlalchemy.orm import Session
 
 from models import Entry
+from services.search_providers.mal import (
+    ANIME_FIELDS, MANGA_FIELDS, BASE as MAL_BASE, _headers as _mal_headers,
+    to_search_result,
+)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-JIKAN_DELAY = 0.4  # seconds between Jikan API requests
+# Spacing between the per-entry MAL lookups. The official API is happy with far
+# more than this (40 parallel requests came back clean), so this is just being
+# polite on a long sequential import.
+MAL_DELAY = 0.1
 
 # MAL status → canonical app status
 MAL_STATUS_MAP: dict[str, str] = {
@@ -167,92 +174,35 @@ def _parse_mal_xml(xml_content: str) -> list[dict]:
     return entries
 
 
-# ── Jikan metadata fetch ──────────────────────────────────────────────────────
+# ── MAL metadata fetch ────────────────────────────────────────────────────────
 
-async def _fetch_jikan_metadata(
+async def _fetch_mal_metadata(
     client: httpx.AsyncClient, mal_id: str, entry_type: str
 ) -> Optional[dict]:
-    """
-    Fetch metadata from Jikan v4 using the MAL ID directly.
-    entry_type: 'anime' or 'manga'
-    Returns a metadata dict or None on failure.
+    """Look up one entry on the official MAL API by its MAL id.
+
+    entry_type is 'anime' or 'manga'. Returns the entry fields we store, or
+    None if the id is missing, the lookup fails, or no client ID is configured.
     """
     if not mal_id:
         return None
+    headers = _mal_headers()
+    if not headers:
+        return None
 
-    url = f"https://api.jikan.moe/v4/{entry_type}/{mal_id}"
+    fields = ANIME_FIELDS if entry_type == "anime" else MANGA_FIELDS
     try:
-        r = await client.get(url, timeout=10.0)
-        r.raise_for_status()
-        data = r.json().get("data") or {}
-        if not data:
-            return None
-
-        # Prefer English title
-        titles = data.get("titles") or []
-        display_title = next(
-            (t["title"] for t in titles if t.get("type") == "English"), None
-        ) or data.get("title") or ""
-
-        images = data.get("images") or {}
-        jpg  = images.get("jpg")  or {}
-        webp = images.get("webp") or {}
-        cover = (
-            webp.get("large_image_url")
-            or jpg.get("large_image_url")
-            or webp.get("image_url")
-            or jpg.get("image_url")
+        r = await client.get(
+            f"{MAL_BASE}/{entry_type}/{mal_id}",
+            params={"fields": fields},
+            headers=headers,
+            timeout=10.0,
         )
-
-        aired = data.get("aired") or data.get("published") or {}
-        prop = aired.get("prop", {}).get("from", {})
-        year = prop.get("year")
-        if not year:
-            aired_from = (aired.get("from") or "")[:4]
-            try:
-                year = int(aired_from) if aired_from else None
-            except (ValueError, TypeError):
-                year = None
-
-        genres_str = ", ".join(
-            g["name"] for g in (data.get("genres") or [])[:5] if g.get("name")
-        ) or None
-
-        score = data.get("score")
-        ext_rating = round(float(score), 1) if score else None
-
-        # Determine medium from MAL type sub-field
-        mal_type_field = (data.get("type") or "").lower()
-        if entry_type == "anime":
-            medium = "Anime"
-        else:
-            if "light novel" in mal_type_field or "novel" in mal_type_field:
-                medium = "Light Novel"
-            else:
-                medium = "Manga"
-
-        # Total unit differs by medium: episodes for anime, volumes for light
-        # novels, chapters for manga.
-        if medium == "Anime":
-            total = data.get("episodes")
-        elif medium == "Light Novel":
-            total = data.get("volumes")
-        else:
-            total = data.get("chapters")
-
-        return {
-            "title":           display_title or None,
-            "medium":          medium,
-            "origin":          "Japanese",
-            "year":            year,
-            "cover_url":       cover,
-            "total":           total,
-            "external_id":     str(mal_id),
-            "source":          "jikan",
-            "external_url":    f"https://myanimelist.net/{entry_type}/{mal_id}",
-            "genres":          genres_str,
-            "external_rating": ext_rating,
-        }
+        r.raise_for_status()
+        data = r.json() or {}
+        if not data.get("id"):
+            return None
+        return to_search_result(data, entry_type).model_dump()
     except Exception:
         return None
 
@@ -305,18 +255,18 @@ async def import_mal_rows(xml_content: str, db: Session, username: str):
             notes        = raw["notes"] or None
             completed_at = _parse_date(raw["finish_date"])
 
-            # ── Jikan lookup ──────────────────────────────────────────────────
-            meta = await _fetch_jikan_metadata(client, mal_id, entry_type)
+            # ── MAL lookup ────────────────────────────────────────────────────
+            meta = await _fetch_mal_metadata(client, mal_id, entry_type)
 
             if meta:
-                jikan_title = meta.get("title") or title
+                mal_title = meta.get("title") or title
                 display = (
-                    f"'{title}' → '{jikan_title}'"
-                    if jikan_title != title
+                    f"'{title}' → '{mal_title}'"
+                    if mal_title != title
                     else f"'{title}'"
                 )
-                yield {"type": "log", "message": f"[{i}/{total}] FOUND  {display} (jikan)"}
-                canonical_title  = jikan_title
+                yield {"type": "log", "message": f"[{i}/{total}] FOUND  {display} (mal)"}
+                canonical_title  = mal_title
                 medium           = meta["medium"]
                 origin           = meta["origin"]
                 year             = meta["year"]
@@ -328,14 +278,14 @@ async def import_mal_rows(xml_content: str, db: Session, username: str):
                 external_rating  = meta["external_rating"]
                 total_val        = total_val or meta["total"]
             else:
-                yield {"type": "log", "message": f"[{i}/{total}] NO HIT '{title}' (jikan id={mal_id})"}
+                yield {"type": "log", "message": f"[{i}/{total}] NO HIT '{title}' (mal id={mal_id})"}
                 canonical_title  = title
                 medium           = "Anime" if entry_type == "anime" else "Manga"
                 origin           = "Japanese"
                 year             = None
                 cover_url        = None
                 external_id      = mal_id
-                source           = "jikan"
+                source           = "mal"
                 external_url     = (
                     f"https://myanimelist.net/{entry_type}/{mal_id}" if mal_id else None
                 )
@@ -402,7 +352,7 @@ async def import_mal_rows(xml_content: str, db: Session, username: str):
                 created += 1
 
             if i < total:
-                await asyncio.sleep(JIKAN_DELAY)
+                await asyncio.sleep(MAL_DELAY)
 
     yield {"type": "done", "created": created, "skipped": skipped, "conflicts": conflicts}
 

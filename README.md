@@ -76,7 +76,7 @@ medium, so a film and a web novel are filtered, sorted, and counted the same way
   | Domain            | Providers                                             |
   |-------------------|-------------------------------------------------------|
   | Film & TV         | IMDb (default), TMDB                                  |
-  | Anime & Manga     | AniList, Jikan (MyAnimeList), Kitsu, MangaDex         |
+  | Anime & Manga     | MyAnimeList, AniList, Kitsu, MangaDex                 |
   | Games             | IGDB, RAWG                                            |
   | Books             | Goodreads (default), Google Books, Open Library       |
   | Novels            | NovelUpdates, MangaUpdates                            |
@@ -205,20 +205,19 @@ These call an official/stable JSON API and are skipped unless their key is set
 | **RAWG** | `RAWG_API_KEY` | Game | Default game source. |
 | **Google Books** | `GOOGLE_BOOKS_API_KEY` (optional) | Book | Works keyless at a lower quota. |
 | **ComicVine** | `COMICVINE_API_KEY` | Comic | Default comic source. |
+| **MyAnimeList** | `MAL_CLIENT_ID` | Anime, Manga, Light Novel | The official API (`api.myanimelist.net/v2`). Every endpoint needs the client ID, even public ones: register an app at [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig). Default anime/manga/LN source. Replaced the Jikan proxy, which MAL cut off from its search and ranking pages. |
 
 ### Keyless REST / GraphQL APIs
 
 No credentials; reachable server-side directly.
 
 - **AniList** — GraphQL (`graphql.anilist.co`). Anime & Manga.
-- **Jikan** — unofficial MyAnimeList REST. Anime & Manga. When you add an
-  *ongoing* MAL manga with no chapter total, the form fills it on demand from
-  MangaUpdates via `GET /search/chapter-count` (shown as `fetching…` in the
-  Total field while it resolves).
 - **Kitsu** — JSON:API. Anime & Manga.
 - **MangaDex** — REST. Manga & Comic.
-- **MangaUpdates** — REST. Manga (curated metadata); also powers the chapter-count
-  lookup above.
+- **MangaUpdates**: REST. Manga (curated metadata). Also fills in the total when
+  you add an *ongoing* MAL manga that has no chapter count, on demand via
+  `GET /search/chapter-count` (shown as `fetching…` in the Total field while it
+  resolves).
 - **VNDB** — POST query API. Visual Novels.
 - **Open Library** — REST. Book fallback.
 
@@ -431,6 +430,8 @@ IGDB_CLIENT_SECRET=
 GOOGLE_BOOKS_API_KEY=
 RAWG_API_KEY=
 COMICVINE_API_KEY=
+MAL_CLIENT_ID=
+MAL_CLIENT_SECRET=
 
 # Email backups (optional; scheduler runs only if HOST/USER/PASSWORD are all set)
 SMTP_HOST=
@@ -440,7 +441,7 @@ SMTP_PASSWORD=
 SMTP_FROM=
 ```
 
-> AniList, Jikan, Kitsu, MangaDex, Open Library, NovelUpdates, MangaUpdates, and
+> AniList, Kitsu, MangaDex, Open Library, NovelUpdates, MangaUpdates, and
 > VNDB need no key. The extension's CORS handling already allows
 > `moz-extension://` / `chrome-extension://` origins regardless of `CORS_ORIGINS`.
 

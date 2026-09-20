@@ -5,7 +5,7 @@ import { statusLabel, fmtDate, progressLabel, onCoverErrorPlaceholder } from '..
 import { coverImgUrl } from '../../api.jsx';
 import EntryFormModal from './EntryFormModal.jsx';
 import { entryToForm } from './EntryForm.jsx';
-import { resultToEntry } from './searchSources.js';
+import { canonicalSource, resultToEntry } from './searchSources.js';
 
 // Fields the source query can refresh. User-owned fields (status, rating,
 // progress, notes, custom_list, completed_at) are never touched by a refresh.
@@ -19,8 +19,8 @@ const REFRESHABLE_FIELDS = [
 // refresh gets those fields too (add-time effects are gated to non-edit). Mutates
 // `merged` in place, filling only blanks so it never clobbers fetched values.
 async function enrichFromSecondarySources(merged) {
-  // Jikan (MAL) manga often ships no chapter total — pull it from MangaUpdates.
-  if (merged.source === 'jikan' && merged.medium === 'Manga' && !merged.total && merged.title) {
+  // MAL manga often ships no chapter total, so pull it from MangaUpdates.
+  if (canonicalSource(merged.source) === 'mal' && merged.medium === 'Manga' && !merged.total && merged.title) {
     try {
       const res = await fetchChapterCount(merged.title);
       if (res?.total) merged.total = res.total;

@@ -140,7 +140,7 @@ async def mangaupdates_chapter_count(
 ) -> int | None:
     """Best-match latest chapter number for ``title`` on MangaUpdates.
 
-    Used as a fallback when MAL/Jikan reports no chapter total for an ongoing
+    Used as a fallback when MAL reports no chapter total for an ongoing
     series. Takes the top search hit, then reads the latest translated chapter.
     """
     try:

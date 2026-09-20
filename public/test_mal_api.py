@@ -136,11 +136,13 @@ def main() -> int:
             flags[f] = flags.get(f, 0) + 1
         print(f"  {'nsfw flags in results':<34} {flags}  (white=safe, gray/black=not)")
 
+    # q must be >= 3 characters or MAL answers 400 "invalid q", which would
+    # measure nothing.
     print("\nRate limit (20 requests as fast as possible)")
     t0 = time.monotonic()
     codes: dict[int, int] = {}
     for _ in range(20):
-        s, _p = get("/anime", q="a", limit=1, fields="id,title")
+        s, _p = get("/anime", q="one", limit=1, fields="id,title")
         codes[s] = codes.get(s, 0) + 1
     elapsed = time.monotonic() - t0
     print(f"  20 requests in {elapsed:.1f}s ({20 / elapsed:.1f}/s) -> {codes}")

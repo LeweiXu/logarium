@@ -4,7 +4,7 @@ Fix Light Novel entries that stored MAL's *chapter* count as the total instead
 of the *volume* count.
 
 For every entry with medium='Light Novel' and source in (jikan, mal), this
-re-queries the Jikan manga endpoint by the entry's external_id (MAL id) and sets
+re-queries the MAL manga endpoint by the entry's external_id (MAL id) and sets
 ``total`` to the series' volume count. Entries whose volume count is unknown
 (e.g. ongoing series MAL hasn't filled in) are left untouched — no fallback.
 
@@ -29,16 +29,24 @@ sys.path.insert(0, _BACKEND_DIR)
 import httpx
 from db import SessionLocal
 from models import Entry
+from services.search_providers.mal import _headers as _mal_headers
 
-JIKAN_MANGA_URL = "https://api.jikan.moe/v4/manga/{mal_id}"
-# Jikan rate limit is ~3 req/s, 60/min — stay well under it.
-REQUEST_DELAY_SECONDS = 0.6
+MAL_MANGA_URL = "https://api.myanimelist.net/v2/manga/{mal_id}"
+REQUEST_DELAY_SECONDS = 0.1
 
 
 def _fetch_volumes(client: httpx.Client, mal_id: str) -> int | None:
-    r = client.get(JIKAN_MANGA_URL.format(mal_id=mal_id))
+    headers = _mal_headers()
+    if not headers:
+        raise RuntimeError("MAL_CLIENT_ID is not set (see backend/.env)")
+    r = client.get(
+        MAL_MANGA_URL.format(mal_id=mal_id),
+        params={"fields": "num_volumes"},
+        headers=headers,
+    )
     r.raise_for_status()
-    return r.json().get("data", {}).get("volumes")
+    # Ongoing series report 0 volumes rather than null.
+    return r.json().get("num_volumes") or None
 
 
 def fix_ln_volumes(username: str, dry_run: bool = False) -> None:
@@ -74,7 +82,7 @@ def fix_ln_volumes(username: str, dry_run: bool = False) -> None:
                 try:
                     volumes = _fetch_volumes(client, entry.external_id)
                 except Exception as exc:
-                    print(f"  [{entry.id}] {entry.title!r:45s}  — Jikan error: {exc}")
+                    print(f"  [{entry.id}] {entry.title!r:45s}  - MAL error: {exc}")
                     errors += 1
                     time.sleep(REQUEST_DELAY_SECONDS)
                     continue

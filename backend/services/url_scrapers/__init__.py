@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from . import (
     novelupdates, jjwxc, qidian, imdb, goodreads,
-    tmdb, anilist, jikan, kitsu, mangadex, mangaupdates,
+    tmdb, anilist, mal, kitsu, mangadex, mangaupdates,
     igdb, rawg, google_books, open_library, comicvine, vndb,
 )
 
@@ -27,7 +27,7 @@ DOMAIN_SCRAPERS = {
     # API-backed sources
     "themoviedb.org":   tmdb.fetch,
     "anilist.co":       anilist.fetch,
-    "myanimelist.net":  jikan.fetch,
+    "myanimelist.net":  mal.fetch,
     "kitsu.io":         kitsu.fetch,
     "kitsu.app":        kitsu.fetch,
     "mangadex.org":     mangadex.fetch,

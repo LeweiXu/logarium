@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     DEMO_USERNAME: str = "demo_user"
 
     # External API keys (all optional)
+    # MyAnimeList's official API. Every endpoint needs the client ID, even the
+    # public ones; register an app at https://myanimelist.net/apiconfig. The
+    # secret is only needed for user-login (OAuth) calls, which we never make.
+    MAL_CLIENT_ID: str = ""
+    MAL_CLIENT_SECRET: str = ""
     TMDB_API_KEY: str = ""
     IGDB_CLIENT_ID: str = ""
     IGDB_CLIENT_SECRET: str = ""
