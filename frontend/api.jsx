@@ -363,6 +363,19 @@ export const coverImgUrl = (coverUrl, size = 'full', coverKey = '') => {
 };
 
 /**
+ * Cover src for an Explore card. Both cover endpoints serve from our cache only
+ * and 404 on a miss, and Explore is the one page routinely showing covers the
+ * server has never fetched, so an uncached item paints from the source URL for
+ * this first render. The ingest that the same response kicked off fills the
+ * cache, and every later render comes from us.
+ */
+export const exploreCoverUrl = (item, size = 'medium') => (
+  item?.cover_cached
+    ? coverImgUrl(item.cover_url, size, item.cover_key)
+    : (item?.cover_url || '')
+);
+
+/**
  * Warm the browser cache for a cover's full size, so the detail modal image is
  * instant on click. It's a plain immutable GET, so the browser HTTP cache does
  * the work — no React Query needed. Best-effort; a 404 (uncached) is harmless.

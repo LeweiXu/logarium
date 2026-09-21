@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -46,6 +47,9 @@ from services.cover_cache_service import (
 )
 
 router = APIRouter()
+
+# How long a reroll will wait for its covers to land before answering anyway.
+REROLL_COVER_WAIT_S = 12.0
 
 # ── Cover cache ───────────────────────────────────────────────────────────────
 
@@ -705,8 +709,8 @@ async def explore(
             )
 
     # Explore items aren't library entries, so this is where we first see their
-    # covers — cache the 3 sizes in the background so the serve path (bundle /img)
-    # can hand them out directly instead of the frontend hotlinking external URLs.
+    # covers. Cache the 3 sizes so the serve path (bundle / img) can hand them
+    # out directly.
     missing_covers: list[str] = []
     for item in result.items or []:
         if not item.cover_url:
@@ -715,7 +719,25 @@ async def explore(
         item.cover_cached = sized_cover_path(item.cover_url, "medium").exists()
         if not item.cover_cached:
             missing_covers.append(item.cover_url)
-    if missing_covers:
+
+    if missing_covers and refresh:
+        # A reroll returns titles we've usually never seen, so every cover is a
+        # miss and the page would paint with nothing in it. The user is already
+        # waiting on a reroll, so fill the cache before answering and re-stamp
+        # the flags. Bounded: whatever doesn't make the deadline stays uncached,
+        # and the client falls back to the source URL for those.
+        try:
+            await asyncio.wait_for(
+                ensure_covers_cached(missing_covers), timeout=REROLL_COVER_WAIT_S
+            )
+        except Exception:
+            # Timed out, or the ingest itself failed. Either way the re-stamp
+            # below reports exactly what made it onto disk.
+            pass
+        for item in result.items or []:
+            if item.cover_url and not item.cover_cached:
+                item.cover_cached = sized_cover_path(item.cover_url, "medium").exists()
+    elif missing_covers:
         background.add_task(ensure_covers_cached, missing_covers)
     return result
 

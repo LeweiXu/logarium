@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  coverImgUrl, getExplore, prefetchCoverImages, restoreExplore, writeExploreCache,
+  exploreCoverUrl, getExplore, prefetchCoverImages, restoreExplore, writeExploreCache,
 } from '../api.jsx';
 import { MEDIUMS, statusLabel, onCoverErrorPlaceholder, visibleMediumsFromPrefs } from '../utils.jsx';
 import { useQueryClient } from '@tanstack/react-query';
@@ -826,7 +826,7 @@ export default function Explore() {
                 <div className="explore-cover">
                   {item.cover_url
                     ? <img
-                        src={coverImgUrl(item.cover_url, 'medium', item.cover_key)}
+                        src={exploreCoverUrl(item, 'medium')}
                         alt=""
                         loading="lazy"
                         referrerPolicy="no-referrer"
