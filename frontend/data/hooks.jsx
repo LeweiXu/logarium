@@ -7,7 +7,7 @@ import {
 } from '../api.jsx';
 import { extractItems } from '../utils.jsx';
 import {
-  entriesKey, countsKey, listsKey, statsKey, dashboardBootstrapKey,
+  entriesKey, countsKey, countParams, listsKey, statsKey, dashboardBootstrapKey,
   libraryBootstrapKey, libraryRevisionKey,
 } from './keys.js';
 import { readShareToken } from './shareSession.js';
@@ -39,8 +39,12 @@ export function useEntries(params, options = {}) {
   });
 }
 
-export function useEntryCounts(options = {}) {
-  return useQuery({ queryKey: countsKey(), queryFn: getEntryCounts, ...options });
+export function useEntryCounts(params = {}, options = {}) {
+  return useQuery({
+    queryKey: countsKey(params),
+    queryFn: () => getEntryCounts(params),
+    ...options,
+  });
 }
 
 export function useCustomLists(options = {}) {
@@ -94,7 +98,7 @@ export function useDashboardBootstrap(options = {}) {
 
 function seedLibraryQueries(qc, params, data) {
   if (data?.entries) qc.setQueryData(entriesKey(params), data.entries);
-  if (data?.counts) qc.setQueryData(countsKey(), data.counts);
+  if (data?.counts) qc.setQueryData(countsKey(countParams(params)), data.counts);
   if (data?.custom_lists) qc.setQueryData(listsKey(), data.custom_lists);
   if (Number.isFinite(data?.revision)) {
     qc.setQueryData(libraryRevisionKey(), { revision: data.revision });
@@ -108,7 +112,7 @@ async function fetchLibraryBootstrapPayload(qc, params) {
   } catch (error) {
     if (!String(error?.message || '').startsWith('404 ')) throw error;
     const [entries, counts, customLists, revision] = await Promise.all([
-      fetchEntriesPayload(params), getEntryCounts(), fetchLists(), getLibraryRevision(),
+      fetchEntriesPayload(params), getEntryCounts(countParams(params)), fetchLists(), getLibraryRevision(),
     ]);
     return seedLibraryQueries(qc, params, {
       entries, counts, custom_lists: customLists, revision: revision?.revision,
@@ -172,8 +176,8 @@ export function prefetchEntryGroupsWithCovers(qc, paramGroups, size = 'thumb') {
 export function prefetchEntries(qc, params) {
   qc.prefetchQuery({ queryKey: entriesKey(params), queryFn: () => fetchEntriesPayload(params) });
 }
-export function prefetchCounts(qc) {
-  qc.prefetchQuery({ queryKey: countsKey(), queryFn: getEntryCounts });
+export function prefetchCounts(qc, params = {}) {
+  qc.prefetchQuery({ queryKey: countsKey(params), queryFn: () => getEntryCounts(params) });
 }
 export function prefetchLists(qc) {
   qc.prefetchQuery({ queryKey: listsKey(), queryFn: fetchLists });

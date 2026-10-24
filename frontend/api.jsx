@@ -112,7 +112,12 @@ export const getEntries = (params = {}) => {
   return req(`/entries${qs ? '?' + qs : ''}`);
 };
 
-export const getEntryCounts = () => req('/entries/counts');
+export const getEntryCounts = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null)),
+  ).toString();
+  return req(`/entries/counts${qs ? '?' + qs : ''}`);
+};
 
 // Returns the user's existing entry whose source/external URL matches, or null.
 export async function findEntryByUrl(externalUrl) {

@@ -459,13 +459,27 @@ def list_entries(
 
 @router.get("/entries/counts", response_model=EntryCountsResponse)
 def entry_counts(
+    status_filter: str = Query(None, alias="status"),
+    medium: str = Query(None),
+    origin: str = Query(None),
+    title: str = Query(None),
+    custom_list: str = Query(None),
+    custom_list_empty: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_service.get_current_user),
 ):
+    """Sidebar counts. Pass the active filters to get them faceted (each group
+    counted with the other filters applied, but not its own)."""
     return entry_service.get_entry_counts(
         db,
         current_user.username,
         visible_mediums=_visible_mediums(current_user),
+        status=status_filter,
+        medium=medium,
+        origin=origin,
+        title=title,
+        custom_list=custom_list,
+        custom_list_empty=custom_list_empty,
     )
 
 @router.get("/entries/duplicates", response_model=list[DuplicateGroup])

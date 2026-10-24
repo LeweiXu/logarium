@@ -141,46 +141,66 @@ def get_entry_counts(
     db: Session,
     username: str,
     visible_mediums: set[str] | None = None,
+    *,
+    status: Optional[str] = None,
+    medium: Optional[str] = None,
+    origin: Optional[str] = None,
+    title:  Optional[str] = None,
+    custom_list: Optional[str] = None,
+    custom_list_empty: bool = False,
 ) -> EntryCountsResponse:
-    def scoped(q):
-        q = q.where(Entry.username == username)
-        return _apply_visible_mediums(q, visible_mediums)
+    """Sidebar counts for the current filter selection.
 
-    total = db.execute(scoped(select(func.count(Entry.id)))).scalar_one()
-    unlisted = db.execute(
-        scoped(select(func.count(Entry.id))).where(
-            or_(Entry.custom_list.is_(None), Entry.custom_list == "")
+    Each facet is counted with every active filter applied EXCEPT its own, which
+    is what makes the sidebar read the way you'd expect: with Completed selected,
+    the medium and origin rows show how many completed entries each one has,
+    while the status rows keep showing what you'd get by switching status within
+    the current medium/origin. `total` follows the status rows (status dropped),
+    so the "All" row equals the sum of the ones under it.
+
+    `unlisted` stays unfiltered on purpose: it sits next to the custom-list chips,
+    whose counts come from /custom-lists, so facing one and not the others would
+    just look broken.
+    """
+    def counted(column=None, *, skip: str = ""):
+        q = (
+            select(column, func.count(Entry.id)).group_by(column)
+            if column is not None
+            else select(func.count(Entry.id))
         )
-    ).scalar_one()
+        q = q.where(Entry.username == username)
+        q = _apply_visible_mediums(q, visible_mediums)
+        return _apply_filters(
+            q,
+            status=None if skip == "status" else status,
+            medium=None if skip == "medium" else medium,
+            origin=None if skip == "origin" else origin,
+            title=title,
+            custom_list=custom_list,
+            custom_list_empty=custom_list_empty,
+        )
 
-    statuses = {
-        key: count
-        for key, count in db.execute(
-            scoped(select(Entry.status, func.count(Entry.id))).group_by(Entry.status)
-        ).all()
-        if key
-    }
-    mediums = {
-        key: count
-        for key, count in db.execute(
-            scoped(select(Entry.medium, func.count(Entry.id))).group_by(Entry.medium)
-        ).all()
-        if key
-    }
-    origins = {
-        key: count
-        for key, count in db.execute(
-            scoped(select(Entry.origin, func.count(Entry.id))).group_by(Entry.origin)
-        ).all()
-        if key
-    }
+    def grouped(column, *, skip: str) -> dict[str, int]:
+        return {
+            key: count
+            for key, count in db.execute(counted(column, skip=skip)).all()
+            if key
+        }
+
+    total = db.execute(counted(skip="status")).scalar_one()
+    unlisted = db.execute(
+        _apply_visible_mediums(
+            select(func.count(Entry.id)).where(Entry.username == username),
+            visible_mediums,
+        ).where(or_(Entry.custom_list.is_(None), Entry.custom_list == ""))
+    ).scalar_one()
 
     return EntryCountsResponse(
         total=total,
         unlisted=unlisted,
-        statuses=statuses,
-        mediums=mediums,
-        origins=origins,
+        statuses=grouped(Entry.status, skip="status"),
+        mediums=grouped(Entry.medium, skip="medium"),
+        origins=grouped(Entry.origin, skip="origin"),
     )
 
 

@@ -6,10 +6,11 @@ import { useRevalidateOnFocus } from '../hooks.jsx';
 import { useShare } from '../share.jsx';
 import {
   useEntries, useEntryCounts, useCustomLists, useEntryMutations, useLibraryBootstrap,
+  prefetchCounts,
   invalidateEntryData, syncUpdatedEntry, syncDeletedEntry, prefetchEntriesWithCovers,
   revalidateLibraryRevision,
 } from '../data/hooks.jsx';
-import { entriesKey } from '../data/keys.js';
+import { countParams, entriesKey } from '../data/keys.js';
 import { coverImgUrl, prefetchCoverImages, prefetchFullCover } from '../api.jsx';
 import AddEntryModal from './components/AddEntryModal.jsx';
 import EntryDetailModal from './components/EntryDetailModal.jsx';
@@ -287,7 +288,15 @@ export default function Library({ initialFilters = {} }) {
   const loading = !settingsApplied || (!bootstrapSettled && bootstrapQuery.isLoading) || entriesQuery.isLoading;
   const error = entriesQuery.error?.message || (!bootstrapSettled ? bootstrapQuery.error?.message || '' : '');
 
-  const countsQuery = useEntryCounts({ enabled: bootstrapSettled });
+  // Counts are faceted against the active filters, so they key on the same
+  // filters as the table (minus sort/paging, which don't change a count).
+  const countFilters = useMemo(() => countParams(entryParams), [entryParams]);
+  const countsQuery = useEntryCounts(countFilters, {
+    enabled: bootstrapSettled,
+    // Hold the previous numbers while the new facets load, so clicking a filter
+    // doesn't blink every count in the sidebar into a skeleton.
+    placeholderData: keepPreviousData,
+  });
   const counts = useMemo(() => buildCounts(countsQuery.data), [countsQuery.data]);
   const unlistedCount = countsQuery.data?.unlisted || 0;
   const loadingCounts = countsQuery.isLoading;
@@ -334,6 +343,7 @@ export default function Library({ initialFilters = {} }) {
       }
     }
     prefetchEntriesWithCovers(qc, params);
+    prefetchCounts(qc, countParams(params));
   }, [buildEntryParams, qc]);
 
   useEffect(() => {

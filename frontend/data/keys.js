@@ -4,7 +4,21 @@
 // order inside the params doesn't matter — same content is the same query.
 
 export const entriesKey = (params = {}) => ['entries', params];
-export const countsKey  = () => ['entryCounts'];
+// Counts are faceted against the active filters, so they key on them.
+export const countsKey  = (params = {}) => ['entryCounts', params];
+
+// The filter subset faceted counts depend on. Sort and paging don't change a
+// count, so they're dropped: paging through a filtered view reuses one cache
+// entry instead of refetching the sidebar on every page.
+const COUNT_FILTERS = ['status', 'medium', 'origin', 'title', 'custom_list', 'custom_list_empty'];
+export function countParams(params = {}) {
+  const out = {};
+  for (const key of COUNT_FILTERS) {
+    const value = params[key];
+    if (value !== undefined && value !== '' && value !== null) out[key] = value;
+  }
+  return out;
+}
 export const listsKey   = () => ['customLists'];
 export const statsKey   = () => ['stats'];
 export const dashboardBootstrapKey = () => ['dashboardBootstrap'];

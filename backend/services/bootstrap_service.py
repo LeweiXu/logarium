@@ -50,6 +50,13 @@ def get_library_bootstrap(
     **entry_params,
 ) -> LibraryBootstrapResponse:
     """Build the first Library view in one authenticated request."""
+    # The sidebar counts are faceted against the same filters the entry query
+    # uses, so they match the table on first paint (sort/paging don't affect them).
+    count_filters = {
+        key: entry_params[key]
+        for key in ("status", "medium", "origin", "title", "custom_list", "custom_list_empty")
+        if key in entry_params
+    }
     return LibraryBootstrapResponse(
         entries=entry_service.get_entries(
             db,
@@ -57,7 +64,9 @@ def get_library_bootstrap(
             visible_mediums=visible_mediums,
             **entry_params,
         ),
-        counts=entry_service.get_entry_counts(db, username, visible_mediums),
+        counts=entry_service.get_entry_counts(
+            db, username, visible_mediums, **count_filters
+        ),
         custom_lists=entry_service.get_custom_lists(db, username, visible_mediums),
         revision=db.get(User, username).library_revision,
     )
