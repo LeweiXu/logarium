@@ -1106,24 +1106,17 @@ export default function Library({ initialFilters = {} }) {
         <span>tools</span>
       </div>
       <div className="sidebar-right">
-        {/* Manage (multi-select) replaces Sort with the batch-edit tools in place. */}
-        {isManage ? (
-          <div className="batch-desktop">{batchPanel}</div>
-        ) : (
-          <>
-            <p className="panel-title">Sort</p>
-            <div className="lib-sort-list">
-              {SORT_FIELDS.map(f => (
-                <div key={f.key} className="sidebar-item lib-sort-item"
-                  onMouseEnter={() => prefetchSort(f.key)}
-                  onClick={() => handleSort(f.key)}>
-                  {f.label}
-                  {sort === f.key && <span className="text-accent">{order === 'asc' ? ' ↑' : ' ↓'}</span>}
-                </div>
-              ))}
+        <p className="panel-title">Sort</p>
+        <div className="lib-sort-list">
+          {SORT_FIELDS.map(f => (
+            <div key={f.key} className="sidebar-item lib-sort-item"
+              onMouseEnter={() => prefetchSort(f.key)}
+              onClick={() => handleSort(f.key)}>
+              {f.label}
+              {sort === f.key && <span className="text-accent">{order === 'asc' ? ' ↑' : ' ↓'}</span>}
             </div>
-          </>
-        )}
+          ))}
+        </div>
 
         <p className="panel-title library-view-title">View</p>
         {!isShare && (
@@ -1160,51 +1153,59 @@ export default function Library({ initialFilters = {} }) {
           </button>
         ))}
 
-        <div className="library-sidebar-section">
-          <p className="panel-title">At a Glance</p>
-          <div className="library-meter-block">
-            <div className="library-meter-head">
-              <span>Completion</span>
-              <span className="text-green">{completionPct}%</span>
+        {/* Multi-select swaps the read-only summaries for the batch-edit
+            tools, so the sort list and view toggles stay put. */}
+        {isManage ? (
+          <div className="library-sidebar-section batch-desktop">{batchPanel}</div>
+        ) : (
+          <>
+            <div className="library-sidebar-section">
+              <p className="panel-title">At a Glance</p>
+              <div className="library-meter-block">
+                <div className="library-meter-head">
+                  <span>Completion</span>
+                  <span className="text-green">{completionPct}%</span>
+                </div>
+                <div className="library-meter">
+                  <div className="library-meter-fill" style={{ '--completion-pct': `${completionPct}%` }} />
+                </div>
+              </div>
+              <div className="stat-grid">
+                <div className="stat-box">
+                  <span className="stat-val">{counts.current || 0}</span>
+                  <span className="stat-lbl">Current</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-val">{counts.completed || 0}</span>
+                  <span className="stat-lbl">Completed</span>
+                </div>
+              </div>
             </div>
-            <div className="library-meter">
-              <div className="library-meter-fill" style={{ '--completion-pct': `${completionPct}%` }} />
-            </div>
-          </div>
-          <div className="stat-grid">
-            <div className="stat-box">
-              <span className="stat-val">{counts.current || 0}</span>
-              <span className="stat-lbl">Current</span>
-            </div>
-            <div className="stat-box">
-              <span className="stat-val">{counts.completed || 0}</span>
-              <span className="stat-lbl">Completed</span>
-            </div>
-          </div>
-        </div>
 
-        <div className="library-sidebar-section">
-          <p className="panel-title">Showing</p>
-          <div className="stat-box library-showing-box">
-            <span className="stat-val">{loading ? <SkeletonLine width={44} height={22} /> : entries.length}</span>
-            <span className="stat-lbl">Entries</span>
-          </div>
-          {statusFilter && (
-            <div className="library-filter-summary library-filter-summary-first">
-              Filter: <span className="text-accent">{statusLabel(statusFilter)}</span>
+            <div className="library-sidebar-section">
+              <p className="panel-title">Showing</p>
+              <div className="stat-box library-showing-box">
+                <span className="stat-val">{loading ? <SkeletonLine width={44} height={22} /> : entries.length}</span>
+                <span className="stat-lbl">Entries</span>
+              </div>
+              {statusFilter && (
+                <div className="library-filter-summary library-filter-summary-first">
+                  Filter: <span className="text-accent">{statusLabel(statusFilter)}</span>
+                </div>
+              )}
+              {mediumFilter && (
+                <div className="library-filter-summary">
+                  Medium: <span className="text-accent">{mediumFilter}</span>
+                </div>
+              )}
+              {listFilter && (
+                <div className="library-filter-summary">
+                  List: <span className="text-accent">{listFilter === UNLISTED_LIST ? 'Unlisted' : listFilter}</span>
+                </div>
+              )}
             </div>
-          )}
-          {mediumFilter && (
-            <div className="library-filter-summary">
-              Medium: <span className="text-accent">{mediumFilter}</span>
-            </div>
-          )}
-          {listFilter && (
-            <div className="library-filter-summary">
-              List: <span className="text-accent">{listFilter === UNLISTED_LIST ? 'Unlisted' : listFilter}</span>
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {showAdd && (
