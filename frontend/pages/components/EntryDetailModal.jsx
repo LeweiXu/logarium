@@ -145,6 +145,7 @@ export default function EntryDetailModal({ entry, onClose, onUpdated, onDeleted,
               <img src={coverImgUrl(current.cover_url, 'full', current.cover_key)} alt=""
                 referrerPolicy="no-referrer"
                 className="entry-detail-cover"
+                data-cover-src={current.cover_url}
                 onError={onCoverErrorPlaceholder} />
             </div>
           )}

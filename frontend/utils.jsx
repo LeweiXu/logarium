@@ -152,7 +152,19 @@ export function onCoverError(e) {
  *  a cover isn't cached yet, e.g. a Cloudflare/NU cover awaiting the extension). */
 export function onCoverErrorPlaceholder(e) {
   const img = e.currentTarget;
-  if (img.src !== COVER_PLACEHOLDER) img.src = COVER_PLACEHOLDER;
+  if (img.src === COVER_PLACEHOLDER) return;
+  // Covers render from our cache, which is filled by a background task that
+  // finishes after the page has painted. So a cover the server has only just
+  // seen (an entry refreshed from its source, a new entry, a new Explore page)
+  // is a 404 on this first render. Try the source URL once before giving up, so
+  // it shows immediately and our cached copy takes over on the next render.
+  const source = img.dataset.coverSrc;
+  if (source && !img.dataset.coverTriedSource && img.src !== source) {
+    img.dataset.coverTriedSource = '1';
+    img.src = source;
+    return;
+  }
+  img.src = COVER_PLACEHOLDER;
 }
 
 export const logDotClass = (status) => ({

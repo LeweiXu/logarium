@@ -992,7 +992,7 @@ export default function Library({ initialFilters = {} }) {
                     <td>
                       <div className="cover-cell">
                         <div className="cover-thumb">
-                          {entry.cover_url && <img src={coverImgUrl(entry.cover_url, 'thumb', entry.cover_key)} alt="" loading="eager" referrerPolicy="no-referrer" onError={onCoverErrorPlaceholder} />}
+                          {entry.cover_url && <img src={coverImgUrl(entry.cover_url, 'thumb', entry.cover_key)} alt="" loading="eager" referrerPolicy="no-referrer" data-cover-src={entry.cover_url} onError={onCoverErrorPlaceholder} />}
                         </div>
                         <span className="media-name">{entry.title}</span>
                       </div>
@@ -1044,7 +1044,7 @@ export default function Library({ initialFilters = {} }) {
                       <td>
                         <div className="cover-cell">
                           <div className="cover-thumb">
-                            {e.cover_url && <img src={coverImgUrl(e.cover_url, 'thumb', e.cover_key)} alt="" loading="eager" referrerPolicy="no-referrer" onError={onCoverErrorPlaceholder} />}
+                            {e.cover_url && <img src={coverImgUrl(e.cover_url, 'thumb', e.cover_key)} alt="" loading="eager" referrerPolicy="no-referrer" data-cover-src={e.cover_url} onError={onCoverErrorPlaceholder} />}
                           </div>
                           <span className="media-name">{e.title}</span>
                         </div>

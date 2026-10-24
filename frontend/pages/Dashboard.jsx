@@ -83,13 +83,14 @@ function tableNeed(table) {
   return titlePad + coverW + coverGap + maxText + dataWidth;
 }
 
-function CoverThumb({ url, title }) {
+function CoverThumb({ url, title, sourceUrl }) {
   return (
     <div className="cover-thumb">
       {url && (
         <img src={url} alt={title}
           loading="eager"
           referrerPolicy="no-referrer"
+          data-cover-src={sourceUrl || undefined}
           onError={onCoverErrorPlaceholder} />
       )}
     </div>
@@ -331,7 +332,7 @@ export default function DashboardAlt({ onFilterChange }) {
         onClick={() => setDetailEntry(e)}>
         <td>
           <div className="cover-cell">
-            <CoverThumb url={coverImgUrl(e.cover_url, 'thumb', e.cover_key)} title={e.title} />
+            <CoverThumb url={coverImgUrl(e.cover_url, 'thumb', e.cover_key)} title={e.title} sourceUrl={e.cover_url} />
             <span className="media-name">{e.title}</span>
           </div>
         </td>

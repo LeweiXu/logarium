@@ -827,6 +827,7 @@ export default function Explore() {
                   {item.cover_url
                     ? <img
                         src={exploreCoverUrl(item, 'medium')}
+                        data-cover-src={item.cover_url || undefined}
                         alt=""
                         loading="lazy"
                         referrerPolicy="no-referrer"
