@@ -100,6 +100,8 @@ function CoverThumb({ url, title, sourceUrl }) {
 export default function DashboardAlt({ onFilterChange }) {
   const { prefs } = usePreferences();
   const dash = prefs.dashboard || DEFAULT_UI.dashboard;
+  // Granularity for the inline rating editor's native up/down buttons.
+  const ratingStep = prefs.rating_step ?? DEFAULT_UI.rating_step;
   const sidebarClass = `${dash.sidebars?.left ? ' always-show-left' : ''}${dash.sidebars?.right ? ' always-show-right' : ''}`;
   const qc = useQueryClient();
   const { isShare } = useShare();
@@ -291,7 +293,7 @@ export default function DashboardAlt({ onFilterChange }) {
         return (
           <td key={col} className="col-rating" onClick={ev => ev.stopPropagation()}>
             {isEditingRating ? (
-              <input className="inline-select inline-number-sm" type="number" min="0" max="10" step="0.5"
+              <input className="inline-select inline-number-sm" type="number" min="0" max="10" step={ratingStep}
                 value={editingRating.value} autoFocus
                 onChange={ev => setEditingRating({ id: e.id, value: ev.target.value })}
                 onKeyDown={ev => { if (ev.key === 'Enter') handleRatingSave(e.id, editingRating.value); if (ev.key === 'Escape') setEditingRating(null); }}

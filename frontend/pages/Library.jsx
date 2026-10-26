@@ -98,6 +98,8 @@ export default function Library({ initialFilters = {} }) {
 
   const { prefs, loaded: prefsLoaded, updateUi } = usePreferences();
   const libPrefs = prefs.library || DEFAULT_UI.library;
+  // Granularity for the inline rating editor's native up/down buttons.
+  const ratingStep = prefs.rating_step ?? DEFAULT_UI.rating_step;
   // When navigation happens after preferences have loaded, use them during the
   // first render. Waiting for an effect here forced a one-frame skeleton even
   // though the matching entries query had already been prefetched.
@@ -714,7 +716,7 @@ export default function Library({ initialFilters = {} }) {
       case 'rating': return (
         <td key={col} className="col-rating" onClick={ev => ev.stopPropagation()}>
           {editingRating?.id === e.id ? (
-            <input className="inline-select inline-number-sm" type="number" min="0" max="10" step="0.5"
+            <input className="inline-select inline-number-sm" type="number" min="0" max="10" step={ratingStep}
               value={editingRating.value} autoFocus
               onChange={ev => setEditingRating({ id: e.id, value: ev.target.value })}
               onKeyDown={ev => {

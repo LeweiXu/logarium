@@ -5,7 +5,6 @@ import { usePreferences, DEFAULT_UI } from '../../preferences.jsx';
 import { extensionNuSeries } from '../../extensionBridge.js';
 import CustomListField from './CustomListField.jsx';
 import CustomSelect from './CustomSelect.jsx';
-import NumberStepper from './NumberStepper.jsx';
 import { canonicalSource } from './searchSources.js';
 
 function toDateInput(iso) {
@@ -357,10 +356,10 @@ export default function EntryForm({
       <div className="form-row-2 entry-form-spaced">
         <div>
           <label className="form-label">Rating (0-10)</label>
-          <NumberStepper className="form-stepper" value={form.rating} step={ratingStep}
-            min={0} max={10} placeholder="-" ariaLabel="Rating"
-            onChange={v => setField('rating', v)}
-            onCommit={() => setField('rating', form.rating === '' ? '' : String(roundToStep(form.rating, ratingStep)))} />
+          <input className="form-input" type="number" min="0" max="10" step={ratingStep}
+            value={form.rating} placeholder="-" aria-label="Rating"
+            onChange={e => setField('rating', e.target.value)}
+            onBlur={() => setField('rating', form.rating === '' ? '' : String(roundToStep(form.rating, ratingStep)))} />
         </div>
         <div>
           <label className="form-label">Source Rating {diffTag('external_rating')}</label>
