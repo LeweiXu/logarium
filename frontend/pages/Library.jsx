@@ -255,18 +255,56 @@ export default function Library({ initialFilters = {} }) {
   const buildEntryParams = useCallback((overrides = {}) => {
     const pageValue = overrides.page ?? page;
     const limitValue = overrides.limit ?? limit;
+    // A search covers the whole library, so the sidebar filters are left out of
+    // the query while one is active. They stay in state (and stay highlighted),
+    // so clearing the box puts the filtered view back exactly as it was.
+    // `overrides.search` lets a caller ask for the no-search shape, which is what
+    // hovering a filter needs to prefetch (clicking one clears the search).
+    const searchTerm = overrides.search !== undefined ? overrides.search : debouncedSearch;
+    const filters = searchTerm
+      ? { title: searchTerm }
+      : {
+          ...(statusFilter && { status: statusFilter }),
+          ...(mediumFilter && { medium: mediumFilter }),
+          ...(originFilter && { origin: originFilter }),
+          ...listParams(),
+        };
     return {
-      ...(debouncedSearch && { title:  debouncedSearch }),
-      ...(statusFilter && { status: statusFilter }),
-      ...(mediumFilter && { medium: mediumFilter }),
-      ...(originFilter && { origin: originFilter }),
-      ...listParams(),
+      ...filters,
       sort: overrides.sort ?? sort,
       order: overrides.order ?? order,
       limit: limitValue,
       offset: overrides.offset ?? ((pageValue - 1) * limitValue),
     };
   }, [debouncedSearch, statusFilter, mediumFilter, originFilter, listParams, sort, order, page, limit]);
+
+  // Whether anything in the sidebar is narrowing the view (a search ignores
+  // these, so the summary says they'll come back).
+  const hasSidebarFilters = Boolean(statusFilter || mediumFilter || originFilter || listFilter);
+
+  // Picking a filter ends the search. Without this the click would look broken:
+  // the search ignores filters, so the results wouldn't budge.
+  const pickFilter = useCallback((setter, value) => {
+    setPage(1);
+    setSearch('');
+    setDebouncedSearch('');
+    setter(value);
+  }, []);
+
+  // Picking a list opens a clean view of it, so the status/medium/origin filters
+  // and any search are reset. Going back to All just widens the view, so it
+  // leaves whatever else is set alone.
+  const pickList = useCallback((value) => {
+    setPage(1);
+    setSearch('');
+    setDebouncedSearch('');
+    if (value !== ALL_LISTS) {
+      setStatusFilter('');
+      setMediumFilter('');
+      setOriginFilter('');
+    }
+    setListFilter(value);
+  }, []);
 
   // Data reads flow through the shared React Query layer. buildEntryParams is the
   // query key, so any filter/sort/page change swaps to a different cached query;
@@ -337,7 +375,7 @@ export default function Library({ initialFilters = {} }) {
   // paints from cache. Only the hovered dimension is swapped; other active filters
   // carry over, matching what clicking the row actually does.
   const prefetchFilter = useCallback((override = {}) => {
-    const params = buildEntryParams({ offset: 0 });
+    const params = buildEntryParams({ offset: 0, search: '' });
     for (const dim of ['status', 'medium', 'origin']) {
       if (dim in override) {
         if (override[dim]) params[dim] = override[dim];
@@ -597,9 +635,15 @@ export default function Library({ initialFilters = {} }) {
   }, [buildEntryParams, qc]);
 
   const prefetchList = useCallback((nextList) => {
-    const params = buildEntryParams({ offset: 0 });
+    const params = buildEntryParams({ offset: 0, search: '' });
     delete params.custom_list;
     delete params.custom_list_empty;
+    // Picking a list resets the other filters, so warm that shape, not this one.
+    if (nextList !== ALL_LISTS) {
+      delete params.status;
+      delete params.medium;
+      delete params.origin;
+    }
     if (nextList === UNLISTED_LIST) params.custom_list_empty = true;
     else if (nextList) params.custom_list = nextList;
     prefetchEntriesWithCovers(qc, params, 'thumb');
@@ -843,7 +887,7 @@ export default function Library({ initialFilters = {} }) {
             <div key={v}
               className={`sidebar-item${statusFilter === v ? ' active' : ''}`}
               onMouseEnter={() => prefetchFilter({ status: v })}
-              onClick={() => { setPage(1); setStatusFilter(v); }}>
+              onClick={() => pickFilter(setStatusFilter, v)}>
               {l}
               {loading || loadingCounts
                 ? <SkeletonLine width={24} height={14} />
@@ -856,9 +900,9 @@ export default function Library({ initialFilters = {} }) {
 
         <div className="sidebar-section">
           <span className="sidebar-label">Medium</span>
-          <div className={`sidebar-item${mediumFilter === '' ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ medium: '' })} onClick={() => { setPage(1); setMediumFilter(''); }}>All</div>
+          <div className={`sidebar-item${mediumFilter === '' ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ medium: '' })} onClick={() => pickFilter(setMediumFilter, '')}>All</div>
           {visibleMediums.map(m => (
-            <div key={m} className={`sidebar-item${mediumFilter === m ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ medium: m })} onClick={() => { setPage(1); setMediumFilter(m); }}>
+            <div key={m} className={`sidebar-item${mediumFilter === m ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ medium: m })} onClick={() => pickFilter(setMediumFilter, m)}>
               {m}
               {loading || loadingCounts
                 ? <SkeletonLine width={24} height={14} />
@@ -871,9 +915,9 @@ export default function Library({ initialFilters = {} }) {
 
         <div className="sidebar-section">
           <span className="sidebar-label">Origin</span>
-          <div className={`sidebar-item${originFilter === '' ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ origin: '' })} onClick={() => { setPage(1); setOriginFilter(''); }}>All</div>
+          <div className={`sidebar-item${originFilter === '' ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ origin: '' })} onClick={() => pickFilter(setOriginFilter, '')}>All</div>
           {ORIGINS.map(o => (
-            <div key={o} className={`sidebar-item${originFilter === o ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ origin: o })} onClick={() => { setPage(1); setOriginFilter(o); }}>
+            <div key={o} className={`sidebar-item${originFilter === o ? ' active' : ''}`} onMouseEnter={() => prefetchFilter({ origin: o })} onClick={() => pickFilter(setOriginFilter, o)}>
               {o}
               {loading || loadingCounts
                 ? <SkeletonLine width={24} height={14} />
@@ -939,7 +983,7 @@ export default function Library({ initialFilters = {} }) {
           lists={lists}
           value={listFilter}
           unlistedCount={unlistedCount}
-          onChange={value => { setPage(1); setListFilter(value); }}
+          onChange={pickList}
           onHover={prefetchList}
           onNew={isShare ? undefined : () => openListsModal('add')}
           loading={loadingLists || loadingCounts}
@@ -1190,20 +1234,38 @@ export default function Library({ initialFilters = {} }) {
                 <span className="stat-val">{loading ? <SkeletonLine width={44} height={22} /> : entries.length}</span>
                 <span className="stat-lbl">Entries</span>
               </div>
-              {statusFilter && (
-                <div className="library-filter-summary library-filter-summary-first">
-                  Filter: <span className="text-accent">{statusLabel(statusFilter)}</span>
-                </div>
-              )}
-              {mediumFilter && (
-                <div className="library-filter-summary">
-                  Medium: <span className="text-accent">{mediumFilter}</span>
-                </div>
-              )}
-              {listFilter && (
-                <div className="library-filter-summary">
-                  List: <span className="text-accent">{listFilter === UNLISTED_LIST ? 'Unlisted' : listFilter}</span>
-                </div>
+              {debouncedSearch ? (
+                <>
+                  <div className="library-filter-summary library-filter-summary-first">
+                    Search: <span className="text-accent">{debouncedSearch}</span>
+                  </div>
+                  <div className="library-filter-summary">
+                    Whole library{hasSidebarFilters ? '; filters resume when cleared' : ''}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {statusFilter && (
+                    <div className="library-filter-summary library-filter-summary-first">
+                      Filter: <span className="text-accent">{statusLabel(statusFilter)}</span>
+                    </div>
+                  )}
+                  {mediumFilter && (
+                    <div className="library-filter-summary">
+                      Medium: <span className="text-accent">{mediumFilter}</span>
+                    </div>
+                  )}
+                  {originFilter && (
+                    <div className="library-filter-summary">
+                      Origin: <span className="text-accent">{originFilter}</span>
+                    </div>
+                  )}
+                  {listFilter && (
+                    <div className="library-filter-summary">
+                      List: <span className="text-accent">{listFilter === UNLISTED_LIST ? 'Unlisted' : listFilter}</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </>
@@ -1229,7 +1291,7 @@ export default function Library({ initialFilters = {} }) {
           initialTab={listModalTab}
           onClose={() => setShowLists(false)}
           existingLists={lists}
-          onCreated={(name) => { setShowLists(false); setListFilter(name); setPage(1); invalidateEntryData(qc); }}
+          onCreated={(name) => { setShowLists(false); pickList(name); invalidateEntryData(qc); }}
           onRenamed={(oldName, newName) => { if (listFilter === oldName) { setListFilter(newName); setPage(1); } invalidateEntryData(qc); }}
           onDeleted={(name) => { if (listFilter === name) { setListFilter(ALL_LISTS); setPage(1); } invalidateEntryData(qc); }}
         />
