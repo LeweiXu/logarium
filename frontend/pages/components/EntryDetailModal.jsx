@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { deleteEntry, fetchByUrl, fetchChapterCount, fetchImdbDetail } from '../../api.jsx';
 import { useShare } from '../../share.jsx';
-import { statusLabel, fmtDate, progressLabel, onCoverErrorPlaceholder, describeEvent, timeAgo } from '../../utils.jsx';
+import { statusLabel, fmtDate, progressLabel, onCoverErrorPlaceholder } from '../../utils.jsx';
 import { coverImgUrl } from '../../api.jsx';
 import EntryFormModal from './EntryFormModal.jsx';
 import { entryToForm } from './EntryForm.jsx';
 import { canonicalSource, resultToEntry } from './searchSources.js';
-import { useEntryEvents } from '../../data/hooks.jsx';
 
 // Fields the source query can refresh. User-owned fields (status, rating,
 // progress, notes, custom_list, completed_at) are never touched by a refresh.
@@ -64,8 +63,6 @@ export default function EntryDetailModal({ entry, onClose, onUpdated, onDeleted,
   // When set, the edit modal opens pre-filled with freshly-fetched source data.
   // `changed` maps each differing field to its previous (saved) value.
   const [refreshData,     setRefreshData]     = useState(null);
-
-  const timeline = useEntryEvents(current.id, { enabled: !editing });
 
   async function handleRefresh() {
     if (!current.external_url) {
@@ -229,22 +226,6 @@ export default function EntryDetailModal({ entry, onClose, onUpdated, onDeleted,
               </a>
             </div>
           )}
-
-          <section className="entry-history" aria-label="Entry history">
-            <div className="form-label">History</div>
-            {timeline.isLoading && <p>Loading history…</p>}
-            {timeline.error && <p role="alert">Could not load history. <button type="button" className="btn btn-outline" onClick={() => timeline.refetch()}>Retry</button></p>}
-            {timeline.data?.length === 0 && <p>No recorded history.</p>}
-            {timeline.data?.map(event => (
-              <div key={event.id} className={`entry-history-event${event.action === 'edited' ? ' history-event-muted' : ''}`}>
-                <div>{describeEvent(event, current.title)}</div>
-                <time dateTime={event.at} title={new Date(event.at).toLocaleString()}>{fmtDate(event.at)}</time>
-                {Math.abs(new Date(event.recorded_at) - new Date(event.at)) > 86400000 && (
-                  <span className="entry-history-recorded">Recorded {timeAgo(event.recorded_at)}</span>
-                )}
-              </div>
-            ))}
-          </section>
 
           <div className="entry-detail-timestamps">
             <span>Added: {fmtDate(current.created_at)}</span>
