@@ -438,6 +438,15 @@ Important: batch routes are POST routes, not PUT/DELETE.
   Defaults to status transitions (`created` + `status`), which is what the Dashboard log
   renders. Limit is 1 to 100; `actions=` (blank) returns every kind, and `exclude=` drops
   individual ones. Each item includes entry title, cover URL/key, medium, and a count. Shared batch actions collapse before limiting. Hidden media are omitted.
+- `GET /entries/refresh/counts`: how many entries each source could refresh,
+  keyed by current source name (retired names like `jikan` count under `mal`).
+- `POST /entries/refresh`: SSE stream. Body `{sources: [...], fields: [...]}`.
+  Re-reads each entry's `external_url` through its provider and writes back the
+  requested fields. `fields` defaults to year/total/cover_url/genres/
+  external_rating/external_id; `title`, `medium` and `origin` are opt-in because
+  a provider will happily relabel a curated classification. Status, rating,
+  progress, notes and lists are never touched. The final event carries counts
+  plus a capped list of what changed, field by field, old value to new.
 - `GET /bootstrap/dashboard` includes `activity`, so the Dashboard does not reconstruct actions from status buckets or entry timestamps.
 - `POST /entries?history_source=manual|explore`: optional provenance for the created event. Extension origins are recorded as `extension`. `EntryCreate.completed_at` and `EntryUpdate.completed_at` remain supported as completion-event inputs, including explicit null to clear a known completion date.
 - The detail modal reads the timeline through TanStack Query; entry mutation invalidation refreshes history and Dashboard bootstrap.
@@ -654,6 +663,7 @@ Current `DEFAULT_UI` shape:
   - `columns.view`
   - `columns.manage`
 - `dashboard`
+  - `rated_statuses` (which statuses the Recently Rated table draws from; all five by default)
   - row counts
   - split percentage
   - fixed table toggles

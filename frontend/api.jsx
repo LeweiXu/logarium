@@ -476,6 +476,49 @@ export async function startCoverCache(onEvent) {
   return { pump, abort: () => controller.abort() };
 }
 
+export const getRefreshCounts = () => req('/entries/refresh/counts');
+
+/** Bulk-refresh entries from their source pages. Same SSE shape as the cover cache. */
+export async function startEntryRefresh(sources, fields, onEvent) {
+  const controller = new AbortController();
+  const res = await fetch(`${BASE}/entries/refresh`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sources, fields }),
+    signal: controller.signal,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+
+  async function pump() {
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop();
+        for (const chunk of chunks) {
+          const dataLine = chunk.split('\n').find(l => l.startsWith('data: '));
+          if (dataLine) {
+            try { onEvent(JSON.parse(dataLine.slice(6))); } catch (_) { /* ignore malformed */ }
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') throw err;
+    }
+  }
+
+  return { pump, abort: () => controller.abort() };
+}
+
 export const getStats = () => req('/stats');
 export const getDashboardBootstrap = () => req('/bootstrap/dashboard');
 export const getLibraryBootstrap = (params = {}) => {

@@ -33,6 +33,7 @@ from services import share_service
 from services.search_service import search_media, lookup_chapter_count
 from services.search_providers.imdb import fetch_imdb_detail
 from services.url_import_service import fetch_from_url
+from services.refresh_service import refresh_entries, refreshable_counts
 from services.stats_service import get_stats
 from services.export_service import export_entries_csv
 from services.import_service import preview_import, confirm_import, auto_import_rows
@@ -505,7 +506,7 @@ def list_duplicate_entries(
 
 @router.get("/activity", response_model=list[ActivityRead])
 def get_activity(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
     actions: str = Query(",".join(history_service.STATUS_ACTIONS),
                          description="Event kinds to include; blank means all"),
     exclude: str = Query(""),
@@ -589,6 +590,41 @@ def update_entry(
     updated = entry_service.update_entry(db, entry, payload)
     background.add_task(_cache_cover_background, updated.cover_url)
     return entry_service.entry_read(updated)
+
+@router.get("/entries/refresh/counts")
+def entry_refresh_counts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_service.get_current_user),
+):
+    """How many entries each source can refresh, so the picker can say so."""
+    return refreshable_counts(db, current_user.username)
+
+
+@router.post("/entries/refresh")
+async def refresh_entries_stream(
+    request: Request,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_service.get_current_user),
+):
+    """Re-fetch every entry from the given sources. SSE stream of progress."""
+    sources = payload.get("sources") or []
+    fields = payload.get("fields")
+    if not isinstance(sources, list) or (fields is not None and not isinstance(fields, list)):
+        raise HTTPException(status_code=422, detail="sources and fields must be lists")
+
+    async def event_stream():
+        async for event in refresh_entries(db, current_user.username, sources, fields):
+            if await request.is_disconnected():
+                break
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 @router.post("/entries/check-duplicates", response_model=DuplicateCheckResponse)
 def check_duplicates(

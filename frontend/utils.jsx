@@ -315,7 +315,15 @@ export function describeEvent(event, title = '') {
     case 'total': return value == null ? <>Cleared length of {name}</> : <>Set length of {name} to {value}</>;
     case 'list': return value == null ? <>Removed {name} from {event.from_value || 'list'}</> : <>Added {name} to list {value}</>;
     case 'notes': return <>Edited notes on {name}</>;
-    case 'meta': return <>Edited {name} ({(event.detail?.fields || []).join(', ')})</>;
+    case 'meta': {
+      const values = event.detail?.values;
+      const fields = event.detail?.fields || [];
+      if (values && fields.length === 1) {
+        const [was, now] = values[fields[0]] || [];
+        return <>Changed {fields[0]} on {name}: {was || 'blank'} &rarr; {now}</>;
+      }
+      return <>Edited {name} ({fields.join(', ')})</>;
+    }
     case 'completed_at': return value == null ? <>Cleared completion date on {name}</> : <>Set completion of {name} to {fmtDate(event.at)}</>;
     default: return <>Edited {name}</>;
   }

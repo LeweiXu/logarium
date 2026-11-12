@@ -33,6 +33,26 @@ export const SOURCE_LABEL = {
 // the switch doesn't silently drop MyAnimeList out of a user's pickers.
 export const LEGACY_SOURCE_ALIASES = { jikan: 'mal' };
 
+// Sources that can only arrive by pasting a URL, so they never appear in the
+// Media & Search Sources picker. Bulk tools still have to offer them: you can
+// own entries from them, and nothing in settings governs that.
+export const URL_ONLY_SOURCES = [
+  { value: 'jjwxc',  label: 'JJWXC' },
+  { value: 'qidian', label: 'Qidian' },
+  { value: 'imdb',   label: 'IMDb' },
+];
+
+/**
+ * Sources a bulk tool (cover resync, entry refresh) may offer: the ones enabled
+ * in settings, plus the URL-only ones that settings never covers.
+ */
+export function enabledSourceList() {
+  const available = loadAvailableSources();
+  const urlOnly = new Set(URL_ONLY_SOURCES.map(s => s.value));
+  const all = [...SEARCH_SOURCES, ...URL_ONLY_SOURCES.filter(s => !SEARCH_SOURCES.some(x => x.value === s.value))];
+  return all.filter(s => available.has(s.value) || urlOnly.has(s.value));
+}
+
 /** Current key for a possibly-retired source name. */
 export const canonicalSource = (value) => LEGACY_SOURCE_ALIASES[value] || value;
 

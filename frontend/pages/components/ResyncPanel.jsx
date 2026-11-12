@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { BASE } from '../../api.jsx';
-import { SEARCH_SOURCES, SOURCE_LABEL } from './searchSources.js';
+import { enabledSourceList } from './searchSources.js';
 
 // ── ResyncPanel ───────────────────────────────────────────────────────────────
 // Inline (Console) version of the extension-driven cover resync. The extension
@@ -9,22 +9,16 @@ import { SEARCH_SOURCES, SOURCE_LABEL } from './searchSources.js';
 // extension does the work headlessly and streams progress back through its bridge.
 // Cancels the run if the panel is unmounted (collapsed).
 
-// URL-only sources that aren't keyword-searchable (so absent from SEARCH_SOURCES)
-// but can still have entries whose covers we want to resync.
-const URL_ONLY_SOURCES = [
-  { value: 'jjwxc',  label: SOURCE_LABEL.jjwxc },
-  { value: 'qidian', label: SOURCE_LABEL.qidian },
-  { value: 'imdb',   label: SOURCE_LABEL.imdb },
-];
-const ALL_SOURCES = [...SEARCH_SOURCES, ...URL_ONLY_SOURCES];
-
 const post = (msg) =>
   window.postMessage({ logarium: true, dir: 'toExt', ...msg }, window.location.origin);
 
 export default function ResyncPanel() {
   // stage: 'select' | 'running' | 'done' | 'error'
   const [stage,    setStage]    = useState('select');
-  const [selected, setSelected] = useState(() => new Set(['novelupdates']));
+  const sources = useMemo(() => enabledSourceList(), []);
+  const [selected, setSelected] = useState(() => (
+    new Set(sources.some(s => s.value === 'novelupdates') ? ['novelupdates'] : [])
+  ));
   const [prog,     setProg]     = useState({ done: 0, total: 0, cached: 0, updated: 0, failed: 0, current: '' });
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -98,7 +92,7 @@ export default function ResyncPanel() {
               )}
             </div>
             <div className="source-grid">
-              {ALL_SOURCES.map(s => {
+              {sources.map(s => {
                 const on = selected.has(s.value);
                 return (
                   <button

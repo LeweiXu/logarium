@@ -22,6 +22,8 @@ import ImportPanel from './components/ImportPanel.jsx';
 import ImportAutoPanel from './components/ImportAutoPanel.jsx';
 import ImportMalPanel from './components/ImportMalPanel.jsx';
 import RatingDefinitionsPanel from './components/RatingDefinitionsPanel.jsx';
+import ActivityLogPanel from './components/ActivityLogPanel.jsx';
+import RefreshPanel from './components/RefreshPanel.jsx';
 import SharePanel from './components/SharePanel.jsx';
 import { useShare } from '../share.jsx';
 import ExtensionDownloadSection from './components/ExtensionDownloadSection.jsx';
@@ -790,6 +792,12 @@ export default function Console({ theme, onThemeChange, accent, onAccentChange, 
             </div>
           </ToolCard>
         )}
+        <ToolCard title="Activity Log" desc="every recorded change, newest first">
+          <div className="console-tool-body"><ActivityLogPanel /></div>
+        </ToolCard>
+        <ToolCard title="Refresh Entries" desc="re-read entries from their source pages">
+          <div className="console-tool-body"><RefreshPanel /></div>
+        </ToolCard>
         <ToolCard title="Quick Add" desc="backfill consumed media from recommendations">
           <div className="console-tool-body">
             <QuickAddModal inline onCreated={reloadLists} />

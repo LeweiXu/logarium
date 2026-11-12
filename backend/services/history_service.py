@@ -59,6 +59,11 @@ def record_event(db: Session, entry: Entry, action, *, before=None, after=None, 
     db.info.setdefault("library_revision_users", set()).add(entry.username)
 
 
+def _text(value):
+    """Event values are stored as text; None stays None."""
+    return None if value is None else str(value)
+
+
 def diff_entry(db, entry, before, *, completed_at=None, completion_supplied=False, batch=None):
     detail = {"batch": batch} if batch else {}
     changed = [k for k in TRACKED_FIELDS if before[k] != getattr(entry, k)]
@@ -75,7 +80,14 @@ def diff_entry(db, entry, before, *, completed_at=None, completion_supplied=Fals
         else:
             meta.append(field)
     if meta:
-        record_event(db, entry, "meta", detail={**detail, "fields": meta})
+        # Keep the old and new values, not just which fields moved: a bulk
+        # refresh can rewrite metadata across hundreds of entries, and "medium
+        # changed" is no use afterwards if you can't see what it changed from.
+        values = {
+            field: [_text(before[field]), _text(getattr(entry, field))]
+            for field in meta
+        }
+        record_event(db, entry, "meta", detail={**detail, "fields": meta, "values": values})
     if completion_supplied and entry.status == "completed" and "status" not in changed:
         old = before["completed_at"]
         if (utc(old) if old else None) != (utc(completed_at) if completed_at else None):

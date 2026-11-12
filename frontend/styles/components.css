@@ -1420,3 +1420,72 @@ html.light .skeleton-pie::after {
   pointer-events: none;
   user-select: none;
 }
+
+/* ── Activity log tool (Console) ─────────────────────────────────────────── */
+.activity-log-filters { margin-bottom: 14px; }
+.activity-log-rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  max-height: 520px;
+  overflow-y: auto;
+}
+.activity-log-row {
+  display: grid;
+  grid-template-columns: 86px 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.activity-log-action {
+  color: var(--dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.activity-log-text { color: var(--text); line-height: 1.5; }
+.activity-log-text strong { color: var(--bright); font-weight: 400; }
+.activity-log-note { color: var(--dim); }
+.activity-log-time { color: var(--dim); font-size: 10px; white-space: nowrap; }
+.activity-log-actions { margin-top: 14px; }
+
+/* ── Entry history (detail modal timeline) ───────────────────────────────── */
+.entry-history { margin-top: 18px; }
+.entry-history-event {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text);
+}
+.entry-history-event > div { flex: 1; }
+.entry-history-event strong { color: var(--bright); font-weight: 400; }
+.entry-history-event time { color: var(--dim); font-size: 10px; white-space: nowrap; }
+.entry-history-recorded { color: var(--dim); font-size: 10px; white-space: nowrap; }
+
+/* ── Refresh entries tool (Console) ──────────────────────────────────────── */
+.refresh-meter { margin: 12px 0; }
+.refresh-changes {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.refresh-change {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.refresh-change-title { color: var(--text); }
+.refresh-change-fields { color: var(--dim); font-size: 10px; white-space: nowrap; }
+.refresh-actions { margin-top: 14px; }
+.refresh-change-fields { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.refresh-change-field { white-space: nowrap; }
