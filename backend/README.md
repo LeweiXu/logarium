@@ -69,3 +69,16 @@ local health endpoint.
 The service uses one uvicorn worker because the periodic backup scheduler runs
 inside the API process. Move that scheduler into its own service or add a
 single-leader lock before increasing the worker count.
+
+
+## Entry history
+
+Entry timestamps are derived from `entry_events`. App writes record events in the same transaction; CSV exports and scheduled backups include full histories in the trailing `events` column. Legacy CSVs still import using their timestamp columns. See [the project context](../public/context.md) for the data model and API contract.
+
+Run integration checks from this directory against a local test database:
+
+```bash
+DATABASE_URL=postgresql:///mediatracker ~/venvs/LOG-venv/bin/python scripts/test_entry_history.py
+```
+
+Back up the production database before deploying migrations. The timestamp-column removal migration checks that every derived date matches its stored value before dropping anything.

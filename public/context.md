@@ -1,6 +1,6 @@
 # LOGARIUM Project Context
 
-Last refreshed from the current repository and recent git history on 2026-06-26.
+Last full refresh: 2026-06-26. Entry history sections updated 2026-11-12.
 
 Use this file as the long-form handoff for future LLM sessions. Also provide
 `AGENTS.md` and any files directly involved in the task. For frontend styling
@@ -300,8 +300,19 @@ Backend scripts:
 - External metadata: `cover_url`, `external_id`, `source`, `external_url`,
   `genres`, `external_rating`.
 - Custom grouping: `custom_list`.
-- Timestamps: `created_at`, `updated_at`, `completed_at`.
+- Read-only timestamps derived from `entry_events`: `created_at` is the created event's `at`; `updated_at` is the maximum `recorded_at`; `completed_at` is null unless the current status is completed, then uses the latest recorded completion event or correction (ties use event ID).
+- These are SQLAlchemy `column_property` queries and remain available to sorting and response schemas. There are no physical timestamp columns on `entries`.
 - Ownership: `username` FK to `users.username`.
+
+`EntryEvent` (`entry_events`):
+
+- `id`, `entry_id` (FK with delete cascade), and denormalized owner `username`.
+- `action`: `created`, `status`, `rating`, `progress`, `total`, `list`, `notes`, `meta`, `completed_at`, or legacy `edited`.
+- `at`: occurrence time, including backdated completions. `recorded_at`: recording time, used for the feed and Updated sort. Imported events retain both timestamps.
+- `from_value` and `to_value`: optional strings. `detail`: JSON for source, batch UUID, changed metadata fields, historical progress total, or backfill markers. Notes content is never copied into history values.
+- Indexes: `(username, recorded_at)` for the feed and `(entry_id, at)` for entry history.
+- `services/history_service.py` records explicit changes. It coalesces progress and notes within 15 minutes, suppresses completion's automatic progress change, and marks batches for feed grouping. Metadata refreshes of untracked fields do not create events.
+- New write paths must use `entry_service` or `history_service.insert_entry`; keep entry and event writes in one transaction. Event-only writes must invalidate the library revision too.
 
 `ExploreCache`:
 
@@ -420,6 +431,14 @@ Batch/duplicate routes:
 
 Important: batch routes are POST routes, not PUT/DELETE.
 
+### Entry History and Activity
+
+- `GET /entries/{entry_id}/events`: owner-scoped timeline, ordered by occurrence time then ID, oldest first. Returns event ID, entry ID, action, `at`, `recorded_at`, optional values, and detail. Other users' entries return 404.
+- `GET /activity?limit=20&exclude=progress,meta`: owner-scoped feed, newest recording first. Limit is 1 to 100; `exclude=` includes every action. Each item includes entry title, cover URL/key, medium, and a count. Shared batch actions collapse before limiting. Hidden media are omitted.
+- `GET /bootstrap/dashboard` includes `activity`, so the Dashboard does not reconstruct actions from status buckets or entry timestamps.
+- `POST /entries?history_source=manual|explore`: optional provenance for the created event. Extension origins are recorded as `extension`. `EntryCreate.completed_at` and `EntryUpdate.completed_at` remain supported as completion-event inputs, including explicit null to clear a known completion date.
+- The detail modal reads the timeline through TanStack Query; entry mutation invalidation refreshes history and Dashboard bootstrap.
+
 ### Custom Lists
 
 - `GET /custom-lists`
@@ -496,6 +515,8 @@ streak data. The aggregate is filtered by `ui.mediums.visible` server-side.
 
 Auto import and MAL import are SSE-style streaming endpoints.
 
+CSV exports retain all existing columns and append `events`, a compact JSON array with each entry's full history (no source account or database IDs). Import validates and restores that array, reassigning ownership and event IDs. Without `events`, legacy dates seed history, including unknown completion dates. Conflict confirmation replaces the entry's history with the imported history. Invalid history is rejected before confirmation commits. Scheduled email backups use the same CSV export, and demo refresh copies histories alongside entries.
+
 ### Backup
 
 - `GET /backup/status`
@@ -529,7 +550,7 @@ Routes live in `frontend/app.jsx`:
 
 `Dashboard.jsx`:
 
-- Shows current, planned, completed/recent, and activity views.
+- Shows current, planned, completed/recent, and real recorded activity. The feed sorts by recording time; entry timelines show occurrence dates and label backdated recordings.
 - Supports quick status/progress/rating interactions.
 - Can send filters to Library through `onFilterChange`.
 - Uses CSS variables for dynamic split and tiny chart/progress values.
@@ -1006,6 +1027,15 @@ Security rules:
 ## 13. Testing and Verification
 
 There is no formal test runner configured yet.
+
+Entry history integration checks:
+
+```bash
+cd backend
+DATABASE_URL=postgresql:///mediatracker ~/venvs/LOG-venv/bin/python scripts/test_entry_history.py
+```
+
+These use an outer transaction and disposable users, rolling back their writes. For schema changes, back up first, compare all date tuples through upgrade/downgrade/upgrade, and require zero differences before deployment.
 
 Recommended checks by change type:
 

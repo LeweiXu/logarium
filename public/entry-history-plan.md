@@ -3,7 +3,20 @@
 Replacing `created_at` / `updated_at` / `completed_at` on `Entry` with a full
 per-entry event log, and rebuilding the Dashboard activity log on top of it.
 
-Status: planned, not started. Written 2026-08-23.
+Status: implemented and migrated on the home server, 2026-11-12. Written 2026-08-23.
+
+## Implementation and rollout
+
+- All six phases are implemented. The Dashboard uses recorded events, the detail modal shows a timeline, and CSV exports/imports and scheduled backups preserve history.
+- The actual migration baseline was `a1c3e5f7b209`. Two hand-written revisions create/backfill events (`7e1a9c2d4b60`) and then remove the columns (`8f2b0d3e5c71`). Column removal checks timestamp equality inside the migration before dropping columns.
+- Seven local entries had unusual timestamp ordering. Backfill uses the earlier of created/updated for the created event's recording time, and the stored updated time for completion's recording time. This preserves those legacy values exactly. Completed entries with unknown completion dates get no completion-defining event.
+- Upgrade, full downgrade, and re-upgrade preserved all 851 local timestamp tuples. Integration checks cover writes, date corrections and clearing, coalescing, batches, ownership, API responses, imports and history restore. Chrome checks covered Dashboard activity, entry timelines, backdating labels, and Library rendering. The production frontend build passed.
+- The nightly demo refresh now copies histories. Verified against a restored database copy: 843 copied entries retained identical metadata, dates, and events.
+- Home server: stopped the API, made and checked a PostgreSQL backup, deployed with `./deploy.sh`, then verified all 1,814 production timestamp tuples with zero differences. Activity, timelines, Dashboard bootstrap, statistics, date sorting, and CSV exports passed authenticated checks for both accounts (907 entries each).
+- Production backup: `~/LOG_backups/entry-history-20261112/database.dump`, with `timestamps.json` and the previous Alembic revision beside it. The service is active at revision `8f2b0d3e5c71`.
+- Frontend changes are committed locally. Nothing was pushed, as specified below.
+
+The remaining sections retain the original design and phase outline.
 
 ## Why
 
