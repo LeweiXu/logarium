@@ -124,7 +124,7 @@ export default function DashboardAlt({ onFilterChange }) {
   const stats   = dashboardData?.stats ?? null;
   const current = dashboardData?.current?.items ?? [];
   const planned = dashboardData?.planned?.items ?? [];
-  const recent  = dashboardData?.completed?.items ?? [];
+  const recent  = dashboardData?.rated?.items ?? [];
   const loading = bootstrapQuery.isLoading;
   const error = bootstrapQuery.error?.message || '';
 
@@ -454,7 +454,7 @@ export default function DashboardAlt({ onFilterChange }) {
             </div>
 
             <div>
-              <div className="section-header">Recently Completed</div>
+              <div className="section-header">Recently Rated</div>
               <SkeletonTable
                 headers={['Title', 'Type', 'Progress', 'Completed', 'Status', 'Rating']}
                 rows={7}
@@ -510,9 +510,9 @@ export default function DashboardAlt({ onFilterChange }) {
             </div>
 
             <div className="table-size-scope">
-      <div className="section-header">Recently Completed</div>
+      <div className="section-header">Recently Rated</div>
       {recent.length === 0
-      ? <div className="dash-empty dash-empty-flush">No completed entries yet.</div>
+      ? <div className="dash-empty dash-empty-flush">No rated entries yet.</div>
       : (
         <table className={dashTableClass('completed')} data-mobile-show="completed"
                 style={tableGapVars(dashCols('completed'))}>

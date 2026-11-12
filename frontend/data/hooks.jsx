@@ -148,7 +148,7 @@ export function prefetchDashboard(qc) {
   }).then(data => prefetchCoverImages([
     ...(data.current?.items || []),
     ...(data.planned?.items || []),
-    ...(data.completed?.items || []),
+    ...(data.rated?.items || []),
   ], 'thumb'));
 }
 

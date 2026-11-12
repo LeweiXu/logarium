@@ -136,6 +136,45 @@ def get_entries(
     )
 
 
+def get_recently_rated(
+    db: Session,
+    *,
+    username: str,
+    statuses: list[str] | None = None,
+    limit: int = 20,
+    visible_mediums: set[str] | None = None,
+) -> EntryListResponse:
+    """Rated entries, most recently rated first.
+
+    "Recently rated" is a better stand-in for "recently consumed" than
+    "recently completed": you rate a thing when you're done with it, whether or
+    not you finished it, so a dropped or on-hold entry belongs here too. Which
+    statuses to draw from is the user's choice (ui.dashboard.rated_statuses).
+
+    Ordering uses when the rating was last recorded. Entries rated before the
+    history table existed have no rating event, so they fall back to their last
+    update, which is the closest thing we have for them.
+    """
+    from models import EntryEvent
+
+    rated_at = (
+        select(func.max(EntryEvent.recorded_at))
+        .where(EntryEvent.entry_id == Entry.id, EntryEvent.action == "rating")
+        .correlate(Entry)
+        .scalar_subquery()
+    )
+    q = select(Entry).where(Entry.username == username, Entry.rating.is_not(None))
+    q = _apply_visible_mediums(q, visible_mediums)
+    if statuses:
+        q = q.where(Entry.status.in_(statuses))
+    rows = db.execute(
+        q.order_by(desc(func.coalesce(rated_at, Entry.updated_at)), asc(Entry.title)).limit(limit)
+    ).scalars().all()
+    return EntryListResponse(
+        items=[entry_read(r) for r in rows], total=len(rows), limit=limit, offset=0,
+    )
+
+
 def get_entry_by_id(db: Session, entry_id: int) -> Optional[Entry]:
     return db.get(Entry, entry_id)
 

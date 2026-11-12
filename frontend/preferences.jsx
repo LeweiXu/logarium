@@ -61,6 +61,10 @@ export const DEFAULT_UI = {
     current_rows: 5,
     planned_rows: 5,
     completed_rows: 20,
+    // Statuses the "Recently Rated" table draws from. All of them by default:
+    // a dropped or shelved entry you rated is just as recently consumed as one
+    // you finished.
+    rated_statuses: ['current', 'planned', 'completed', 'on_hold', 'dropped'],
     sidebars: {
       left: false,
       right: false,

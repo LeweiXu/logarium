@@ -293,6 +293,10 @@ DEFAULT_UI: dict[str, Any] = {
         "current_rows": 5,
         "planned_rows": 5,
         "completed_rows": 20,
+        # Which statuses the "Recently Rated" table draws from. All of them by
+        # default: you rate things you dropped or shelved too, and those are
+        # just as much "recently consumed" as the ones you finished.
+        "rated_statuses": ["current", "planned", "completed", "on_hold", "dropped"],
         "sidebars": {
             "left": False,
             "right": False,
@@ -623,7 +627,7 @@ class DashboardBootstrapResponse(BaseModel):
     activity: list[ActivityRead] = Field(default_factory=list)
     stats: DashboardStatsResponse
     current: EntryListResponse
-    completed: EntryListResponse
+    rated: EntryListResponse
     on_hold: EntryListResponse
     dropped: EntryListResponse
     planned: EntryListResponse

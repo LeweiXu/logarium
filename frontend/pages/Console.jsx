@@ -3,7 +3,7 @@ import {
   changePassword, deleteAllEntries, getSettings, updateSettings,
   getBackupStatus, runBackup, getCustomLists, exportEntries,
 } from '../api.jsx';
-import { MEDIUMS } from '../utils.jsx';
+import { MEDIUMS, STATUSES, statusLabel } from '../utils.jsx';
 import { usePreferences, DEFAULT_UI } from '../preferences.jsx';
 import { useExtensionPresent, useExtensionStatus } from '../extensionBridge.js';
 import CustomSelect from './components/CustomSelect.jsx';
@@ -459,6 +459,14 @@ export default function Console({ theme, onThemeChange, accent, onAccentChange, 
     saveUi({ display: { accent: next } });
   }
 
+  const ratedStatuses = dash.rated_statuses ?? DEFAULT_UI.dashboard.rated_statuses;
+  function toggleRatedStatus(status) {
+    const next = ratedStatuses.includes(status)
+      ? ratedStatuses.filter(s => s !== status)
+      : STATUSES.filter(s => ratedStatuses.includes(s) || s === status);
+    saveUi({ dashboard: { rated_statuses: next } });
+  }
+
   function toggleDashFluid(table) {
     saveUi({ dashboard: { fixed_tables: { [table]: !dashFixed(table) } } });
   }
@@ -883,10 +891,19 @@ export default function Console({ theme, onThemeChange, accent, onAccentChange, 
               options={ROW_OPTIONS.map(n => ({ value: n, label: String(n) }))}
               onChange={v => saveUi({ dashboard: { planned_rows: Number(v) } })} ariaLabel="Planned rows" />
           </Row>
-          <Row title="Recently completed — rows" desc="Maximum rows shown in the completed table.">
+          <Row title="Recently rated — rows" desc="Maximum rows shown in the recently rated table.">
             <RowSelect value={dash.completed_rows}
               options={ROW_OPTIONS.map(n => ({ value: n, label: String(n) }))}
-              onChange={v => saveUi({ dashboard: { completed_rows: Number(v) } })} ariaLabel="Recently completed rows" />
+              onChange={v => saveUi({ dashboard: { completed_rows: Number(v) } })} ariaLabel="Recently rated rows" />
+          </Row>
+          <Row title="Recently rated — statuses" desc="Which statuses the table draws from. Rating something is the signal you consumed it, finished or not." stack>
+            <div className="settings-chip-row">
+              {STATUSES.map(status => (
+                <ChipToggle key={status} label={statusLabel(status)}
+                  on={ratedStatuses.includes(status)}
+                  onClick={() => toggleRatedStatus(status)} />
+              ))}
+            </div>
           </Row>
           <Row title="Current / Planned split" desc="Auto-balances the two top tables so whitespace after the longest title is even. Turn on Manual split to set the widths yourself." stack>
             <div className="dash-split-control">
@@ -907,7 +924,7 @@ export default function Console({ theme, onThemeChange, accent, onAccentChange, 
             <div className="settings-chip-row">
               <ChipToggle label="Current" on={!dashFixed('current')} onClick={() => toggleDashFluid('current')} />
               <ChipToggle label="Planned" on={!dashFixed('planned')} onClick={() => toggleDashFluid('planned')} />
-              <ChipToggle label="Recently Completed" on={!dashFixed('completed')} onClick={() => toggleDashFluid('completed')} />
+              <ChipToggle label="Recently Rated" on={!dashFixed('completed')} onClick={() => toggleDashFluid('completed')} />
             </div>
           </Row>
           <Row title="Always show sidebars" desc="Override automatic desktop sidebar hiding on the Dashboard page." stack>

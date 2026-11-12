@@ -2,7 +2,7 @@ import asyncio
 import io
 import json
 from typing import Literal
-from constants import VALID_EVENT_ACTIONS
+from constants import VALID_EVENT_ACTIONS, VALID_STATUSES
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -208,6 +208,13 @@ def _settings_payload(user: User) -> UserSettings:
     return out
 
 
+def _rated_statuses(user: User) -> list[str] | None:
+    """Statuses the Dashboard's Recently Rated table draws from."""
+    dashboard = deep_merge_ui(user.ui_preferences).get("dashboard", {})
+    statuses = dashboard.get("rated_statuses")
+    return [s for s in statuses if s in VALID_STATUSES] if isinstance(statuses, list) else None
+
+
 def _visible_mediums(user: User) -> set[str] | None:
     ui = deep_merge_ui(user.ui_preferences)
     visible = ui.get("mediums", {}).get("visible")
@@ -223,6 +230,7 @@ def dashboard_bootstrap(
         db,
         current_user.username,
         _visible_mediums(current_user),
+        _rated_statuses(current_user),
     )
 
 
