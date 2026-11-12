@@ -2,7 +2,9 @@
 # Sync the Logarium backend, apply migrations, and restart its user service.
 set -euo pipefail
 
-SERVER="${LOGARIUM_SERVER:-lingwei@192.168.20.17}"
+# The ssh alias, not a raw IP: the server's LAN address changes now and then and
+# ~/.ssh/config is the one place that should know it.
+SERVER="${LOGARIUM_SERVER:-homeserver}"
 # Key-based auth, so a deploy never stops to ask for a password. Point
 # LOGARIUM_SSH_KEY somewhere else (or at a nonexistent path) to fall back to
 # whatever ~/.ssh/config says for the host.
