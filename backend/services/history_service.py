@@ -76,8 +76,14 @@ def diff_entry(db, entry, before, *, completed_at=None, completion_supplied=Fals
 def seed_history(db, entry, data, *, source, replace=False):
     """Preserve legacy timestamps, including unknown completion dates."""
     from sqlalchemy import delete
+    events = parse_events(data.get("events"))
     if replace:
         db.execute(delete(EntryEvent).where(EntryEvent.entry_id == entry.id))
+    if events is not None:
+        for values in events:
+            db.add(EntryEvent(entry_id=entry.id, username=entry.username, **values))
+        db.info.setdefault("library_revision_users", set()).add(entry.username)
+        return
     now = utc()
     created = utc(data["created_at"]) if data.get("created_at") else now
     updated = utc(data["updated_at"]) if data.get("updated_at") else now
@@ -99,9 +105,56 @@ def seed_history(db, entry, data, *, source, replace=False):
 
 def insert_entry(db, data, *, source):
     data = dict(data)
-    dates = {k: data.pop(k, None) for k in ("created_at", "updated_at", "completed_at")}
+    dates = {k: data.pop(k, None) for k in ("created_at", "updated_at", "completed_at", "events")}
     entry = Entry(**data)
     db.add(entry)
     db.flush()
     seed_history(db, entry, dates, source=source)
     return entry
+
+
+def parse_events(raw):
+    """Validate portable events without accepting entry IDs or account ownership."""
+    import json
+    from pydantic import BaseModel, Field, field_validator
+
+    class PortableEvent(BaseModel):
+        action: str
+        at: datetime
+        recorded_at: datetime
+        from_value: str | None = Field(None, max_length=200)
+        to_value: str | None = Field(None, max_length=200)
+        detail: dict | None = None
+
+        @field_validator("action")
+        @classmethod
+        def action_known(cls, value):
+            if value not in VALID_EVENT_ACTIONS:
+                raise ValueError("Unknown history action")
+            return value
+
+    if raw is None or raw == "":
+        return None
+    rows = json.loads(raw) if isinstance(raw, str) else raw
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("events must be a nonempty JSON array")
+    events = [PortableEvent.model_validate(row).model_dump() for row in rows]
+    if sum(v["action"] == "created" for v in events) != 1:
+        raise ValueError("History must contain exactly one created event")
+    return [{**v, "at": utc(v["at"]), "recorded_at": utc(v["recorded_at"])} for v in events]
+
+
+def export_history(db, entry_ids):
+    """Load all requested histories in one query, preserving tie order."""
+    result = {eid: [] for eid in entry_ids}
+    if not result:
+        return result
+    rows = db.scalars(select(EntryEvent).where(EntryEvent.entry_id.in_(result))
+                      .order_by(EntryEvent.recorded_at, EntryEvent.id))
+    for event in rows:
+        result[event.entry_id].append({
+            "action": event.action, "at": event.at.isoformat(),
+            "recorded_at": event.recorded_at.isoformat(),
+            "from_value": event.from_value, "to_value": event.to_value, "detail": event.detail,
+        })
+    return result

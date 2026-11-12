@@ -47,7 +47,7 @@ from constants import (
 from db import SessionLocal
 from models import Entry
 from services.search_service import search_media
-from services.history_service import insert_entry, seed_history
+from services.history_service import insert_entry, seed_history, parse_events, export_history
 
 
 # ── Progress / status parsing ─────────────────────────────────────────────────
@@ -95,10 +95,11 @@ EXPORT_HEADERS = [
     "title", "medium", "origin", "year", "cover_url", "notes",
     "external_id", "source", "status", "rating", "progress", "total",
     "created_at", "updated_at", "completed_at",
-    "external_url", "genres", "external_rating", "custom_list",
+    "external_url", "genres", "external_rating", "custom_list", "events",
 ]
 
-LEGACY_EXPORT_HEADERS = [h for h in EXPORT_HEADERS if h != "custom_list"]
+PRE_HISTORY_HEADERS = [h for h in EXPORT_HEADERS if h != "events"]
+LEGACY_EXPORT_HEADERS = [h for h in PRE_HISTORY_HEADERS if h != "custom_list"]
 
 _COMPARE_FIELDS = [
     "title", "medium", "origin", "year", "cover_url", "notes",
@@ -151,7 +152,7 @@ def _csv_to_typed(row: dict) -> dict:
         "origin":          normalise_origin(_str(row.get("origin"))),
         "year":            _int(row.get("year")),
         "cover_url":       _str(row.get("cover_url")),
-        "notes":           _str(row.get("notes")),
+        "notes":           row.get("notes") or None,
         "external_id":     _str(row.get("external_id")),
         "source":          _str(row.get("source")),
         "status":          raw_status if raw_status in _VALID_STATUSES else "planned",
@@ -165,6 +166,7 @@ def _csv_to_typed(row: dict) -> dict:
         "genres":          _str(row.get("genres")),
         "external_rating": _float(row.get("external_rating")),
         "custom_list":     _str(row.get("custom_list")),
+        "events":          parse_events(row.get("events")),
     }
 
 
@@ -202,6 +204,8 @@ def _fields_equal(field: str, csv_val, db_val) -> bool:
 def _entry_to_dict(entry: "Entry") -> dict:
     result = {"id": entry.id}
     for col in EXPORT_HEADERS:
+        if col == "events":
+            continue
         val = getattr(entry, col)
         if isinstance(val, datetime):
             val = val.isoformat()
@@ -219,7 +223,7 @@ def preview_import(db: Session, csv_content: str, username: str) -> dict:
     """
     reader = csv.DictReader(io.StringIO(csv_content))
     fieldnames = list(reader.fieldnames or [])
-    if fieldnames not in (EXPORT_HEADERS, LEGACY_EXPORT_HEADERS):
+    if fieldnames not in (EXPORT_HEADERS, PRE_HISTORY_HEADERS, LEGACY_EXPORT_HEADERS):
         return {
             "error": "Invalid CSV headers. This file must be exported from this app.",
             "to_import": [],
@@ -234,8 +238,12 @@ def preview_import(db: Session, csv_content: str, username: str) -> dict:
     exact_duplicates: list[dict] = []
     conflicts: list[dict] = []
 
+    histories = export_history(db, [e.id for e in db_entries])
     for row in rows:
-        typed = _csv_to_typed(row)
+        try:
+            typed = _csv_to_typed(row)
+        except ValueError as exc:
+            return {"error": str(exc), "to_import": [], "exact_duplicates": [], "conflicts": []}
         title = typed.get("title")
         if not title:
             continue
@@ -255,6 +263,7 @@ def preview_import(db: Session, csv_content: str, username: str) -> dict:
         # Check each match for exact equality
         exact_found = any(
             all(_fields_equal(f, typed.get(f), getattr(e, f)) for f in _COMPARE_FIELDS)
+            and (typed["events"] is None or typed["events"] == parse_events(histories[e.id]))
             for e in identity_matches
         )
 
@@ -321,7 +330,7 @@ def confirm_import(
         # CSV omits it does the server_default stamp "now".
         if typed.get("updated_at") is not None:
             entry_data["updated_at"] = typed["updated_at"]
-        insert_entry(db, entry_data, source="csv")
+        insert_entry(db, {**entry_data, "events": typed.get("events")}, source="csv")
         created += 1
 
     for item in to_update:
@@ -366,79 +375,8 @@ def import_csv_for_user(db: Session, csv_content: str, username: str) -> dict:
     preserved; otherwise the database assigns the current timestamp.
     Returns {"created": N, "skipped": N}.
     """
-    def _int(val: str | None) -> Optional[int]:
-        try:
-            v = (val or "").strip()
-            return int(v) if v else None
-        except (ValueError, TypeError):
-            return None
-
-    def _float(val: str | None) -> Optional[float]:
-        try:
-            v = (val or "").strip()
-            return float(v) if v else None
-        except (ValueError, TypeError):
-            return None
-
-    def _str(val: str | None) -> Optional[str]:
-        v = (val or "").strip()
-        return v or None
-
-    def _dt(val: str | None) -> Optional[datetime]:
-        v = (val or "").strip()
-        if not v:
-            return None
-        # Try DD/MM/YY and DD/MM/YYYY first (legacy format)
-        parsed = _parse_date(v)
-        if parsed:
-            return parsed
-        # Try ISO 8601
-        try:
-            return datetime.fromisoformat(v.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            return None
-
-    reader = csv.DictReader(io.StringIO(csv_content))
-    created = 0
-    skipped = 0
-
-    for row in reader:
-        title = _str(row.get("title"))
-        if not title:
-            skipped += 1
-            continue
-
-        raw_status = _str(row.get("status")) or "planned"
-        status = raw_status if raw_status in _VALID_STATUSES else "planned"
-
-        entry_data = dict(
-            title=title,
-            medium=normalise_medium(_str(row.get("medium"))),
-            origin=normalise_origin(_str(row.get("origin"))),
-            year=_int(row.get("year")),
-            cover_url=_str(row.get("cover_url")),
-            notes=_str(row.get("notes")),
-            external_id=_str(row.get("external_id")),
-            source=_str(row.get("source")),
-            status=status,
-            rating=_float(row.get("rating")),
-            progress=_int(row.get("progress")),
-            total=_int(row.get("total")),
-            completed_at=_dt(row.get("completed_at")),
-            custom_list=_str(row.get("custom_list")),
-            username=username,
-        )
-        created_at = _dt(row.get("created_at"))
-        if created_at is not None:
-            entry_data["created_at"] = created_at
-        updated_at = _dt(row.get("updated_at"))
-        if updated_at is not None:
-            entry_data["updated_at"] = updated_at
-        insert_entry(db, entry_data, source="csv")
-        created += 1
-
-    db.commit()
-    return {"created": created, "skipped": skipped}
+    result = confirm_import(db, list(csv.DictReader(io.StringIO(csv_content))), [], username)
+    return {"created": result["created"], "skipped": result["skipped"]}
 
 SEARCH_DELAY = 0.4
 
@@ -566,7 +504,7 @@ async def auto_import_rows(csv_content: str, db: Session, username: str):
         )
         if typed.get("created_at") is not None:
             entry_data["created_at"] = typed["created_at"]
-        insert_entry(db, {**entry_data, "updated_at": typed.get("updated_at")}, source="auto")
+        insert_entry(db, {**entry_data, "updated_at": typed.get("updated_at"), "events": typed.get("events")}, source="auto")
         db.commit()
         created += 1
 

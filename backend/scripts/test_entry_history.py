@@ -81,6 +81,50 @@ class HistoryChecks(unittest.TestCase):
         entries.delete_entry(self.db, e)
         self.assertEqual(self.db.scalar(select(func.count()).select_from(EntryEvent).where(EntryEvent.entry_id == eid)), 0)
 
+    def test_export_restore_and_conflicts(self):
+        import csv
+        import io
+        from services.export_service import export_entries_csv
+        from services.import_service import confirm_import, preview_import
+        from services.history_service import export_history
+        e = self.create(status="current", notes="  keep whitespace  ", external_url="https://example.test/title")
+        entries.update_entry(self.db, e, EntryUpdate(rating=8, status="completed",
+            completed_at=datetime(2019, 1, 1, tzinfo=timezone.utc)))
+        exported = export_entries_csv(self.db, self.username)
+        row = next(csv.DictReader(io.StringIO(exported)))
+        original = export_history(self.db, [e.id])[e.id]
+        self.assertEqual(len(preview_import(self.db, exported, self.username)["exact_duplicates"]), 1)
+        confirm_import(self.db, [row], [], self.username)
+        restored = self.db.scalars(select(Entry).where(Entry.username == self.username).order_by(Entry.id.desc())).first()
+        self.assertEqual(export_history(self.db, [restored.id])[restored.id], original)
+        self.assertEqual(restored.notes, "  keep whitespace  ")
+        self.assertEqual(restored.completed_at, e.completed_at)
+        entries.update_entry(self.db, restored, EntryUpdate(rating=1))
+        confirm_import(self.db, [], [{"db_id": restored.id, "csv_row": row}], self.username)
+        self.db.refresh(restored)
+        self.assertEqual(restored.rating, 8)
+        self.assertEqual(export_history(self.db, [restored.id])[restored.id], original)
+        bad = {**row, "events": '[]'}
+        with self.assertRaises(ValueError):
+            confirm_import(self.db, [bad], [], self.username)
+        self.db.rollback()
+
+    def test_legacy_and_mal_import(self):
+        from services.import_service import confirm_import
+        from services.import_mal_service import confirm_mal_import
+        row = {"title": "Legacy", "status": "completed", "created_at": "2020-01-01T00:00:00Z",
+               "updated_at": "2019-01-01T00:00:00Z"}
+        confirm_import(self.db, [row], [], self.username)
+        e = self.db.scalar(select(Entry).where(Entry.username == self.username))
+        self.assertIsNone(e.completed_at)
+        self.assertEqual(e.created_at.year, 2020)
+        self.assertEqual(e.updated_at.year, 2019)
+        confirm_mal_import(self.db, [{"title": "MAL", "status": "completed",
+                                     "completed_at": "2018-01-01T00:00:00+00:00"}], self.username)
+        mal = self.db.scalar(select(Entry).where(Entry.username == self.username, Entry.title == "MAL"))
+        self.assertEqual(mal.completed_at.year, 2018)
+        self.assertEqual(self.events(mal)[0].detail["source"], "mal")
+
 
 if __name__ == "__main__":
     unittest.main()

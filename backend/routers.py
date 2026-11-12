@@ -368,7 +368,10 @@ def import_confirm(
     current_user: User = Depends(auth_service.get_current_user),
 ):
     to_update = [{"db_id": item.db_id, "csv_row": item.csv_row} for item in payload.to_update]
-    return confirm_import(db, payload.to_create, to_update, current_user.username)
+    try:
+        return confirm_import(db, payload.to_create, to_update, current_user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @router.post("/entries/import/auto")
 async def import_auto(

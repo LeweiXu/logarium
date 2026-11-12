@@ -26,6 +26,7 @@ from sqlalchemy.orm import sessionmaker
 from config import get_settings
 from models import Entry, ExploreCache, User
 from schemas import DEFAULT_UI
+from services.history_service import insert_entry, export_history
 
 DEFAULT_BACKUP_FREQ = "never"
 
@@ -97,16 +98,13 @@ def sync_demo_entries(db_url: str) -> None:
             # 2. Copy source entries to demo_user. The column list comes from
             # the current SQLAlchemy model so migrations like custom_list do not
             # silently fall out of sync with this cron job.
-            copy_cols = _copyable_entry_columns()
-            insert_cols = [*copy_cols, "username"]
-            select_cols = [getattr(Entry, col) for col in copy_cols]
-            result = session.execute(
-                insert(Entry).from_select(
-                    insert_cols,
-                    select(*select_cols, literal(DEST_USER)).where(Entry.username == SOURCE_USER),
-                )
-            )
-            log.info("Copied %d entries from '%s' to '%s'.", result.rowcount, SOURCE_USER, DEST_USER)
+            source_entries = session.scalars(select(Entry).where(Entry.username == SOURCE_USER)).all()
+            histories = export_history(session, [e.id for e in source_entries])
+            for entry in source_entries:
+                data = {col: getattr(entry, col) for col in _copyable_entry_columns()}
+                insert_entry(session, {**data, "username": DEST_USER, "events": histories[entry.id]}, source="csv")
+            log.info("Copied %d entries and histories to '%s'.", len(source_entries), DEST_USER)
+
 
             # 3. Copy Explore cache so the demo account can serve cached
             # recommendations immediately without inheriting source settings.
