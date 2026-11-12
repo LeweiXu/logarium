@@ -130,8 +130,10 @@ export default function DashboardAlt({ onFilterChange }) {
 
   // Straight from recorded history: the latest status move per entry, so an
   // edit to something finished years ago no longer reads as "Completed" today.
-  // The backend already limits it to ten and to status transitions.
-  const activity = dashboardData?.activity ?? [];
+  // The backend sends ten status transitions; the slice is belt and braces for
+  // a frontend deployed ahead of the API, which would otherwise render whatever
+  // the older feed sent (twenty rows, edits included).
+  const activity = (dashboardData?.activity ?? []).slice(0, 10);
 
   const reload = useCallback(() => invalidateEntryData(qc), [qc]);
 
