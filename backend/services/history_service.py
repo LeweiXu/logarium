@@ -158,3 +158,38 @@ def export_history(db, entry_ids):
             "from_value": event.from_value, "to_value": event.to_value, "detail": event.detail,
         })
     return result
+
+
+def entry_events(db, entry_id, username):
+    return db.scalars(select(EntryEvent).where(
+        EntryEvent.entry_id == entry_id, EntryEvent.username == username,
+    ).order_by(EntryEvent.at, EntryEvent.id)).all()
+
+
+def activity(db, username, *, limit=20, exclude=("progress", "meta"), visible_mediums=None):
+    from sqlalchemy import cast, String, func, or_
+    from schemas import ActivityRead
+    from services.cover_cache_service import cover_cache_key
+
+    batch = func.coalesce(EntryEvent.detail["batch"].as_string(), cast(EntryEvent.id, String))
+    groups = [batch, EntryEvent.action, EntryEvent.to_value]
+    q = select(
+        EntryEvent.id.label("event_id"),
+        func.row_number().over(partition_by=groups, order_by=[EntryEvent.recorded_at.desc(), EntryEvent.id.desc()]).label("position"),
+        func.count().over(partition_by=groups).label("count"),
+    ).join(Entry, Entry.id == EntryEvent.entry_id).where(
+        EntryEvent.username == username, Entry.username == username,
+        EntryEvent.action.not_in(exclude),
+    )
+    if visible_mediums is not None:
+        q = q.where(or_(Entry.medium.is_(None), Entry.medium.in_(visible_mediums)))
+    ranked = q.subquery()
+    rows = db.execute(select(EntryEvent, Entry.title, Entry.cover_url, Entry.medium, ranked.c.count)
+        .join(ranked, ranked.c.event_id == EntryEvent.id).join(Entry, Entry.id == EntryEvent.entry_id)
+        .where(ranked.c.position == 1)
+        .order_by(EntryEvent.recorded_at.desc(), EntryEvent.id.desc()).limit(limit)).all()
+    return [ActivityRead.model_validate({
+        **{k: getattr(event, k) for k in ("id", "entry_id", "action", "at", "recorded_at", "from_value", "to_value", "detail")},
+        "title": title, "cover_url": cover, "cover_key": cover_cache_key(cover) if cover else None,
+        "medium": medium, "count": count,
+    }) for event, title, cover, medium, count in rows]

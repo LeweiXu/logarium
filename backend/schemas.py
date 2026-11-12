@@ -136,6 +136,26 @@ class EntryRead(EntryBase):
     cover_key:     Optional[str] = None
     model_config = {"from_attributes": True}
 
+class EntryEventRead(BaseModel):
+    id: int
+    entry_id: int
+    action: str
+    at: datetime
+    recorded_at: datetime
+    from_value: str | None = None
+    to_value: str | None = None
+    detail: dict[str, Any] | None = None
+    model_config = {"from_attributes": True}
+
+
+class ActivityRead(EntryEventRead):
+    title: str
+    cover_url: str | None = None
+    cover_key: str | None = None
+    medium: str | None = None
+    count: int = 1
+
+
 class EntryListResponse(BaseModel):
     items: list[EntryRead]
     total: int
@@ -600,6 +620,7 @@ class DashboardStatsResponse(BaseModel):
 
 
 class DashboardBootstrapResponse(BaseModel):
+    activity: list[ActivityRead] = Field(default_factory=list)
     stats: DashboardStatsResponse
     current: EntryListResponse
     completed: EntryListResponse

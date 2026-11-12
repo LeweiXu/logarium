@@ -125,6 +125,37 @@ class HistoryChecks(unittest.TestCase):
         self.assertEqual(mal.completed_at.year, 2018)
         self.assertEqual(self.events(mal)[0].detail["source"], "mal")
 
+    def test_activity_api_and_ownership(self):
+        from fastapi.testclient import TestClient
+        from db import get_db
+        from main import app
+        from services import auth_service
+        e = self.create(status="current", medium="Anime")
+        other = self.create(medium="Book")
+        entries.batch_update_entries(self.db, self.username, [e.id, other.id], EntryUpdate(status="dropped"))
+        app.dependency_overrides[get_db] = lambda: self.db
+        app.dependency_overrides[auth_service.get_current_user] = lambda: self.db.get(User, self.username)
+        try:
+            client = TestClient(app)
+            feed = client.get("/activity").json()
+            self.assertEqual(feed[0]["count"], 2)
+            self.assertEqual(feed[0]["action"], "status")
+            self.assertEqual(len(client.get(f"/entries/{e.id}/events").json()), 2)
+            bootstrap = client.get("/bootstrap/dashboard")
+            self.assertEqual(bootstrap.status_code, 200)
+            self.assertEqual(bootstrap.json()["activity"][0]["count"], 2)
+            self.assertEqual(client.get("/activity?exclude=bad").status_code, 422)
+            self.assertEqual(client.get("/activity?limit=0").status_code, 422)
+            created = client.post("/entries?history_source=explore", json={"title": "Explore check"})
+            self.assertEqual(created.status_code, 201)
+            events = client.get(f"/entries/{created.json()['id']}/events").json()
+            self.assertEqual(events[0]["detail"]["source"], "explore")
+            app.dependency_overrides[auth_service.get_current_user] = lambda: User(username="other-account")
+            self.assertEqual(client.get(f"/entries/{e.id}/events").status_code, 404)
+            self.assertEqual(client.get("/activity").json(), [])
+        finally:
+            app.dependency_overrides.clear()
+
 
 if __name__ == "__main__":
     unittest.main()

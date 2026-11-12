@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from models import User
 from schemas import DashboardBootstrapResponse, LibraryBootstrapResponse
-from services import entry_service
+from services import entry_service, history_service
 from services.stats_service import get_dashboard_stats
 
 
@@ -19,6 +19,7 @@ def get_dashboard_bootstrap(
         "include_total": False,
     }
     return DashboardBootstrapResponse(
+        activity=history_service.activity(db, username, visible_mediums=visible_mediums),
         stats=get_dashboard_stats(db, username, visible_mediums),
         current=entry_service.get_entries(
             **shared, status="current", limit=20,

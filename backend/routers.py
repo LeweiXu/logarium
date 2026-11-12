@@ -1,6 +1,8 @@
 import asyncio
 import io
 import json
+from typing import Literal
+from constants import VALID_EVENT_ACTIONS
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -12,6 +14,7 @@ from schemas import (
     BackupStatus,
     BatchUpdateRequest, BatchDeleteRequest, BatchResult, DuplicateGroup,
     CustomListRead, CustomListRename,
+    EntryEventRead, ActivityRead,
     EntryCountsResponse, EntryCreate, EntryListResponse, EntryRead, EntryUpdate,
     ImportConfirmRequest, ImportConfirmResponse, ImportPreviewResponse,
     SearchResult, ShareLink, ShareSession, StatsResponse,
@@ -22,7 +25,7 @@ from schemas import (
     ExploreCacheWriteRequest, ExploreResponse,
     deep_merge, deep_merge_ui,
 )
-from services import entry_service
+from services import entry_service, history_service
 from services.bootstrap_service import get_dashboard_bootstrap, get_library_bootstrap
 from services.entry_service import delete_all_entries
 from services import auth_service
@@ -492,6 +495,32 @@ def list_duplicate_entries(
 ):
     return entry_service.find_duplicate_groups(db, current_user.username)
 
+@router.get("/activity", response_model=list[ActivityRead])
+def get_activity(
+    limit: int = Query(20, ge=1, le=100),
+    exclude: str = Query("progress,meta"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_service.get_current_user),
+):
+    excluded = {v.strip() for v in exclude.split(",") if v.strip()}
+    if excluded - VALID_EVENT_ACTIONS:
+        raise HTTPException(status_code=422, detail="Unknown event action")
+    return history_service.activity(db, current_user.username, limit=limit, exclude=excluded,
+                                    visible_mediums=_visible_mediums(current_user))
+
+
+@router.get("/entries/{entry_id}/events", response_model=list[EntryEventRead])
+def get_entry_events(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_service.get_current_user),
+):
+    entry = entry_service.get_entry_by_id(db, entry_id)
+    if not entry or entry.username != current_user.username:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return history_service.entry_events(db, entry_id, current_user.username)
+
+
 @router.get("/entries/{entry_id}", response_model=EntryRead)
 def get_entry(
     entry_id: int,
@@ -521,10 +550,14 @@ def _cache_cover_background(cover_url: str | None) -> None:
 def create_entry(
     payload: EntryCreate,
     background: BackgroundTasks,
+    request: Request,
+    history_source: Literal["manual", "explore"] = Query("manual"),
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_service.get_current_user),
 ):
-    entry = entry_service.create_entry(db, payload, username=current_user.username)
+    origin = request.headers.get("origin", "")
+    source = "extension" if origin.startswith(("chrome-extension://", "moz-extension://")) else history_source
+    entry = entry_service.create_entry(db, payload, username=current_user.username, source=source)
     background.add_task(_cache_cover_background, entry.cover_url)
     return entry_service.entry_read(entry)
 
