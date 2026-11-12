@@ -47,6 +47,7 @@ from constants import (
 from db import SessionLocal
 from models import Entry
 from services.search_service import search_media
+from services.history_service import insert_entry, seed_history
 
 
 # ── Progress / status parsing ─────────────────────────────────────────────────
@@ -320,7 +321,7 @@ def confirm_import(
         # CSV omits it does the server_default stamp "now".
         if typed.get("updated_at") is not None:
             entry_data["updated_at"] = typed["updated_at"]
-        db.add(Entry(**entry_data))
+        insert_entry(db, entry_data, source="csv")
         created += 1
 
     for item in to_update:
@@ -347,18 +348,11 @@ def confirm_import(
         entry.rating          = typed.get("rating")
         entry.progress        = typed.get("progress")
         entry.total           = typed.get("total")
-        if typed.get("created_at") is not None:
-            entry.created_at = typed["created_at"]
-        entry.completed_at    = typed.get("completed_at")
         entry.external_url    = typed.get("external_url")
         entry.genres          = typed.get("genres")
         entry.external_rating = typed.get("external_rating")
         entry.custom_list     = typed.get("custom_list")
-        # Preserve the CSV's updated_at. Setting it explicitly puts the column in
-        # the UPDATE's SET clause, which suppresses the onupdate "now" stamp; if
-        # the CSV omits it, we leave the column alone and onupdate stamps "now".
-        if typed.get("updated_at") is not None:
-            entry.updated_at = typed["updated_at"]
+        seed_history(db, entry, typed, source="csv", replace=True)
         updated += 1
 
     db.commit()
@@ -440,7 +434,7 @@ def import_csv_for_user(db: Session, csv_content: str, username: str) -> dict:
         updated_at = _dt(row.get("updated_at"))
         if updated_at is not None:
             entry_data["updated_at"] = updated_at
-        db.add(Entry(**entry_data))
+        insert_entry(db, entry_data, source="csv")
         created += 1
 
     db.commit()
@@ -572,7 +566,7 @@ async def auto_import_rows(csv_content: str, db: Session, username: str):
         )
         if typed.get("created_at") is not None:
             entry_data["created_at"] = typed["created_at"]
-        db.add(Entry(**entry_data))
+        insert_entry(db, {**entry_data, "updated_at": typed.get("updated_at")}, source="auto")
         db.commit()
         created += 1
 

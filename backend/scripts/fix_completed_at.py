@@ -20,11 +20,14 @@ from datetime import datetime, timezone, timedelta
 
 # Allow running from the backend/ directory
 import os
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.chdir(Path(__file__).resolve().parents[1])
 
 from sqlalchemy import extract
 from db import SessionLocal
 from models import Entry
+from services.entry_service import _apply_update
 
 
 def random_datetime_between(start: datetime, end: datetime) -> datetime:
@@ -83,7 +86,7 @@ def fix_completed_at(username: str, dry_run: bool = False, current_month: bool =
             print(f"  [{entry.id}] {entry.title!r:50s}  year={entry.year}  -> completed_at={chosen.date()}")
 
             if not dry_run:
-                entry.completed_at = chosen
+                _apply_update(db, entry, {"completed_at": chosen})
 
         if not dry_run:
             db.commit()

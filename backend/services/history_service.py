@@ -71,3 +71,37 @@ def diff_entry(db, entry, before, *, completed_at=None, completion_supplied=Fals
         if (utc(old) if old else None) != (utc(completed_at) if completed_at else None):
             record_event(db, entry, "completed_at", before=old, after=completed_at,
                          at=completed_at, detail=detail)
+
+
+def seed_history(db, entry, data, *, source, replace=False):
+    """Preserve legacy timestamps, including unknown completion dates."""
+    from sqlalchemy import delete
+    if replace:
+        db.execute(delete(EntryEvent).where(EntryEvent.entry_id == entry.id))
+    now = utc()
+    created = utc(data["created_at"]) if data.get("created_at") else now
+    updated = utc(data["updated_at"]) if data.get("updated_at") else now
+    completed = data.get("completed_at")
+    detail = {"source": source}
+    if data.get("created_at") or data.get("updated_at"):
+        detail["backfilled"] = True
+    db.add(EntryEvent(entry_id=entry.id, username=entry.username, action="created",
+        at=created, recorded_at=min(created, updated),
+        to_value="planned" if entry.status == "completed" else entry.status, detail=detail))
+    if entry.status == "completed" and completed:
+        db.add(EntryEvent(entry_id=entry.id, username=entry.username, action="status",
+            at=utc(completed), recorded_at=updated, from_value="planned", to_value="completed", detail=detail))
+    elif updated > created:
+        db.add(EntryEvent(entry_id=entry.id, username=entry.username, action="edited",
+            at=updated, recorded_at=updated, detail=detail))
+    db.info.setdefault("library_revision_users", set()).add(entry.username)
+
+
+def insert_entry(db, data, *, source):
+    data = dict(data)
+    dates = {k: data.pop(k, None) for k in ("created_at", "updated_at", "completed_at")}
+    entry = Entry(**data)
+    db.add(entry)
+    db.flush()
+    seed_history(db, entry, dates, source=source)
+    return entry

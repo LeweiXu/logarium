@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from backend.db import engine, SessionLocal, Base
-import backend.models  # noqa: F401
+from db import engine, SessionLocal, Base
+import models  # noqa: F401
 
 
 def create_tables() -> None:
@@ -44,9 +44,10 @@ SAMPLE_ENTRIES = [
 ]
 
 
-def seed_data() -> None:
+def seed_data(username: str) -> None:
     from datetime import datetime, timezone
-    from backend.models import Entry
+    from models import Entry, User
+    from services.history_service import insert_entry
 
     db = SessionLocal()
     try:
@@ -55,12 +56,12 @@ def seed_data() -> None:
             return
 
         print(f"Inserting {len(SAMPLE_ENTRIES)} sample entries…")
+        if not db.get(User, username):
+            raise ValueError("Register the seed user in the app first")
         now = datetime.now(timezone.utc)
         for data in SAMPLE_ENTRIES:
-            entry = Entry(**data, created_at=now, updated_at=now)
-            if entry.status == "completed":
-                entry.completed_at = now
-            db.add(entry)
+            insert_entry(db, {**data, "username": username,
+                "completed_at": now if data["status"] == "completed" else None}, source="manual")
         db.commit()
         print("Seed complete.")
     finally:
@@ -70,4 +71,4 @@ def seed_data() -> None:
 if __name__ == "__main__":
     create_tables()
     if "--seed" in sys.argv:
-        seed_data()
+        seed_data(sys.argv[sys.argv.index("--seed") + 1] if sys.argv.index("--seed") + 1 < len(sys.argv) else "lingwei")

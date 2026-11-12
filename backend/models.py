@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 from typing import Any
-from sqlalchemy import Integer, String, Float, DateTime, Text, Boolean, JSON, func, ForeignKey, UniqueConstraint, Index, event, update
-from sqlalchemy.orm import Mapped, Session, mapped_column
+from sqlalchemy import Integer, String, Float, DateTime, Text, Boolean, JSON, func, ForeignKey, UniqueConstraint, Index, event, update, select, case, and_, or_
+from sqlalchemy.orm import Mapped, Session, mapped_column, column_property
 from db import Base
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -74,13 +75,25 @@ class Entry(Base):
     rating: Mapped[float | None] = mapped_column(Float, nullable=True)
     progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total:    Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=_utcnow, nullable=False)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at = column_property(
+        select(EntryEvent.at).where(EntryEvent.entry_id == id, EntryEvent.action == "created")
+        .order_by(EntryEvent.recorded_at, EntryEvent.id).limit(1).correlate_except(EntryEvent).scalar_subquery()
+    )
+    updated_at = column_property(
+        select(func.max(EntryEvent.recorded_at)).where(EntryEvent.entry_id == id)
+        .correlate_except(EntryEvent).scalar_subquery()
+    )
+    completed_at = column_property(case((status == "completed",
+        select(case((and_(EntryEvent.action == "completed_at", EntryEvent.to_value.is_(None)), None),
+                    else_=EntryEvent.at)).where(
+            EntryEvent.entry_id == id,
+            or_(and_(EntryEvent.action.in_(["created", "status"]), EntryEvent.to_value == "completed"),
+                EntryEvent.action == "completed_at"),
+        ).order_by(EntryEvent.recorded_at.desc(), EntryEvent.id.desc()).limit(1)
+        .correlate_except(EntryEvent).scalar_subquery()
+    ), else_=None))
     username: Mapped[str] = mapped_column(String(100), ForeignKey("users.username"), nullable=False, index=True)
     __table_args__ = (
-        Index("ix_entries_user_updated_at", "username", "updated_at"),
-        Index("ix_entries_user_completed_at", "username", "completed_at"),
         Index("ix_entries_user_title", "username", "title"),
         Index("ix_entries_user_rating", "username", "rating"),
         Index("ix_entries_user_year", "username", "year"),

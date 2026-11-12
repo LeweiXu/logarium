@@ -24,6 +24,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from models import Entry
+from services.history_service import insert_entry
 from services.search_providers.mal import (
     ANIME_FIELDS, MANGA_FIELDS, BASE as MAL_BASE, _headers as _mal_headers,
     to_search_result,
@@ -327,7 +328,7 @@ async def import_mal_rows(xml_content: str, db: Session, username: str):
                     "existing": _entry_to_dict(match),
                 })
             else:
-                entry = Entry(
+                entry = insert_entry(db, dict(
                     title=canonical_title,
                     medium=medium,
                     origin=origin,
@@ -345,8 +346,7 @@ async def import_mal_rows(xml_content: str, db: Session, username: str):
                     external_rating=external_rating,
                     completed_at=completed_at,
                     username=username,
-                )
-                db.add(entry)
+                ), source="mal")
                 db.commit()
                 db_entries.append(entry)  # include in future soft-match checks
                 created += 1
@@ -382,7 +382,7 @@ def confirm_mal_import(db: Session, entries: list[dict], username: str) -> dict:
             except (ValueError, TypeError):
                 pass
 
-        db.add(Entry(
+        insert_entry(db, dict(
             title=title,
             medium=data.get("medium"),
             origin=data.get("origin"),
@@ -400,7 +400,7 @@ def confirm_mal_import(db: Session, entries: list[dict], username: str) -> dict:
             external_rating=data.get("external_rating"),
             completed_at=completed_at,
             username=username,
-        ))
+        ), source="mal")
         created += 1
 
     db.commit()

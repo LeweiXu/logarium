@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
+
+from services import history_service
 
 from sqlalchemy import func, select, asc, desc, and_, or_, nullslast, update
 from sqlalchemy.orm import Session
@@ -112,7 +115,7 @@ def get_entries(
     # skip the extra count query and use the returned row count instead.
     total = None
     if include_total:
-        count_q = select(func.count()).select_from(base_q.subquery())
+        count_q = base_q.with_only_columns(func.count(Entry.id))
         total = db.execute(count_q).scalar_one()
 
     # Paginated results — always put NULLs last so unrated/undated entries
@@ -227,10 +230,9 @@ def rename_custom_list(db: Session, username: str, old_name: str, new_name: str)
         Entry.username == username,
         Entry.custom_list == old_name,
     ).all()
-    now = datetime.now(timezone.utc)
+    batch = str(uuid4())
     for entry in entries:
-        entry.custom_list = new_name
-        entry.updated_at = now
+        _apply_update(db, entry, {"custom_list": new_name}, batch=batch)
     db.commit()
     return len(entries)
 
@@ -243,64 +245,44 @@ def clear_custom_list(db: Session, username: str, list_name: str) -> int:
         Entry.username == username,
         Entry.custom_list == list_name,
     ).all()
-    now = datetime.now(timezone.utc)
+    batch = str(uuid4())
     for entry in entries:
-        entry.custom_list = None
-        entry.updated_at = now
+        _apply_update(db, entry, {"custom_list": None}, batch=batch)
     db.commit()
     return len(entries)
 
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
-def create_entry(db: Session, payload: EntryCreate, username: str) -> Entry:
+def create_entry(db: Session, payload: EntryCreate, username: str, source: str = "manual") -> Entry:
     data = payload.model_dump(exclude_none=False)
-    entry = Entry(**data, username=username)
-
-    # If created as completed, use provided completed_at or auto-stamp
-    if entry.status == "completed":
-        if entry.completed_at is None:
-            entry.completed_at = datetime.now(timezone.utc)
-        # Auto-set progress to total to indicate full completion
-        if entry.total is not None:
-            entry.progress = entry.total
-
-    db.add(entry)
+    if data["status"] == "completed":
+        data["completed_at"] = data.get("completed_at") or datetime.now(timezone.utc)
+        if data.get("total") is not None:
+            data["progress"] = data["total"]
+    entry = history_service.insert_entry(db, {**data, "username": username}, source=source)
     db.commit()
     db.refresh(entry)
     return entry
 
 
-# ── Update ────────────────────────────────────────────────────────────────────
-
-def _apply_update(entry: Entry, data: dict) -> None:
-    """Apply an EntryUpdate dict to an entry in place (no commit).
-
-    Preserves completed_at / progress auto-management so single and batch
-    updates behave identically. `data` is expected to be the result of
-    EntryUpdate.model_dump(exclude_unset=True).
-    """
+def _apply_update(db: Session, entry: Entry, data: dict, *, batch=None) -> None:
+    """Apply a patch and record its intent in the same transaction."""
+    db.refresh(entry, with_for_update=True)
+    before = history_service.snapshot(entry)
     for field, value in data.items():
-        setattr(entry, field, value)
-
-    # Handle completed_at when status changes to completed
-    if data.get("status") == "completed":
-        # Auto-stamp only if completed_at was not explicitly provided in this update
-        if entry.completed_at is None:
-            entry.completed_at = datetime.now(timezone.utc)
-        # Auto-set progress to total
-        if entry.total is not None:
-            entry.progress = entry.total
-
-    # Clear completed_at if status moves away from completed
-    if data.get("status") and data["status"] != "completed":
-        entry.completed_at = None
-
-    entry.updated_at = datetime.now(timezone.utc)
+        if field != "completed_at":
+            setattr(entry, field, value)
+    if entry.status == "completed" and data.get("status") == "completed" and entry.total is not None:
+        entry.progress = entry.total
+    history_service.diff_entry(
+        db, entry, before, completed_at=data.get("completed_at"),
+        completion_supplied="completed_at" in data, batch=batch,
+    )
 
 
 def update_entry(db: Session, entry: Entry, payload: EntryUpdate) -> Entry:
-    _apply_update(entry, payload.model_dump(exclude_unset=True))
+    _apply_update(db, entry, payload.model_dump(exclude_unset=True))
     db.commit()
     db.refresh(entry)
     return entry
@@ -314,8 +296,9 @@ def batch_update_entries(db: Session, username: str, ids: list[int], payload: En
     entries = db.execute(
         select(Entry).where(Entry.username == username, Entry.id.in_(ids))
     ).scalars().all()
+    batch = str(uuid4())
     for entry in entries:
-        _apply_update(entry, data)
+        _apply_update(db, entry, data, batch=batch)
     db.commit()
     return len(entries)
 
