@@ -1,6 +1,8 @@
 """Record changes explicitly, in the same transaction as the entry write."""
 from datetime import datetime, timedelta, timezone
 
+from pydantic import BaseModel, Field, field_validator
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,7 +30,11 @@ def record_event(db: Session, entry: Entry, action, *, before=None, after=None, 
         raise ValueError("Unknown history action")
     now = utc()
     detail = detail or {}
-    value = lambda v: v.isoformat() if isinstance(v, datetime) else str(v) if v is not None else None
+    if action == "notes":
+        before = after = None
+
+    def value(v):
+        return v.isoformat() if isinstance(v, datetime) else str(v) if v is not None else None
     previous = None
     if action in {"progress", "notes"} and not detail.get("batch"):
         db.flush()
@@ -113,26 +119,25 @@ def insert_entry(db, data, *, source):
     return entry
 
 
+class PortableEvent(BaseModel):
+    action: str
+    at: datetime
+    recorded_at: datetime
+    from_value: str | None = Field(None, max_length=200)
+    to_value: str | None = Field(None, max_length=200)
+    detail: dict | None = None
+
+    @field_validator("action")
+    @classmethod
+    def action_known(cls, value):
+        if value not in VALID_EVENT_ACTIONS:
+            raise ValueError("Unknown history action")
+        return value
+
+
 def parse_events(raw):
     """Validate portable events without accepting entry IDs or account ownership."""
     import json
-    from pydantic import BaseModel, Field, field_validator
-
-    class PortableEvent(BaseModel):
-        action: str
-        at: datetime
-        recorded_at: datetime
-        from_value: str | None = Field(None, max_length=200)
-        to_value: str | None = Field(None, max_length=200)
-        detail: dict | None = None
-
-        @field_validator("action")
-        @classmethod
-        def action_known(cls, value):
-            if value not in VALID_EVENT_ACTIONS:
-                raise ValueError("Unknown history action")
-            return value
-
     if raw is None or raw == "":
         return None
     rows = json.loads(raw) if isinstance(raw, str) else raw

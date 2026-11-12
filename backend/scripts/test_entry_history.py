@@ -62,9 +62,11 @@ class HistoryChecks(unittest.TestCase):
         for progress in (1, 2, 3):
             entries.update_entry(self.db, e, EntryUpdate(progress=progress))
         self.assertEqual([v.action for v in self.events(e)], ["created", "progress"])
-        for note in ("one", "two"):
+        for note in ("one", "two" * 500):
             entries.update_entry(self.db, e, EntryUpdate(notes=note))
-        self.assertEqual(len([v for v in self.events(e) if v.action == "notes"]), 1)
+        notes = [v for v in self.events(e) if v.action == "notes"]
+        self.assertEqual(len(notes), 1)
+        self.assertIsNone(notes[0].to_value)
         updated = e.updated_at
         entries.update_entry(self.db, e, EntryUpdate(external_rating=9))
         self.assertEqual(e.updated_at, updated)
