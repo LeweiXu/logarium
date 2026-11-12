@@ -214,20 +214,6 @@
 .log-text strong   { color: var(--bright); font-weight: 400; }
 .log-time          { font-size: 10px; color: var(--dim); margin-top: 1px; display: block; }
 
-/* The log line is a <button> now (clicking it opens the entry), but it has to
-   read as plain text, so strip the browser's button chrome. Size and colour
-   still come from .log-text above, which sits on the same element. */
-.activity-entry-link {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  background: none;
-  border: none;
-  text-align: left;
-}
-.activity-entry-link:hover strong { color: var(--accent); }
-
 /* Events the migration backfilled: the timestamp is real, the specific change
    isn't known, so they sit back a little in the entry's timeline. */
 .history-event-muted { opacity: 0.6; }
