@@ -434,7 +434,10 @@ Important: batch routes are POST routes, not PUT/DELETE.
 ### Entry History and Activity
 
 - `GET /entries/{entry_id}/events`: owner-scoped timeline, ordered by occurrence time then ID, oldest first. Returns event ID, entry ID, action, `at`, `recorded_at`, optional values, and detail. Other users' entries return 404.
-- `GET /activity?limit=20&exclude=progress,meta`: owner-scoped feed, newest recording first. Limit is 1 to 100; `exclude=` includes every action. Each item includes entry title, cover URL/key, medium, and a count. Shared batch actions collapse before limiting. Hidden media are omitted.
+- `GET /activity?limit=20&actions=created,status`: owner-scoped feed, newest recording first.
+  Defaults to status transitions (`created` + `status`), which is what the Dashboard log
+  renders. Limit is 1 to 100; `actions=` (blank) returns every kind, and `exclude=` drops
+  individual ones. Each item includes entry title, cover URL/key, medium, and a count. Shared batch actions collapse before limiting. Hidden media are omitted.
 - `GET /bootstrap/dashboard` includes `activity`, so the Dashboard does not reconstruct actions from status buckets or entry timestamps.
 - `POST /entries?history_source=manual|explore`: optional provenance for the created event. Extension origins are recorded as `extension`. `EntryCreate.completed_at` and `EntryUpdate.completed_at` remain supported as completion-event inputs, including explicit null to clear a known completion date.
 - The detail modal reads the timeline through TanStack Query; entry mutation invalidation refreshes history and Dashboard bootstrap.
