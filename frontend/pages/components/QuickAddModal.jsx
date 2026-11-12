@@ -202,7 +202,7 @@ export default function QuickAddModal({ onClose, onCreated, medium: initialMediu
         genres:          current.genres       || '',
         external_rating: current.external_rating ?? undefined,
         custom_list:     form.custom_list || undefined,
-      });
+      }, 'explore');
       setDismissed(prev => new Set(prev).add(currentKey));
       setAdded(n => n + 1);
       onCreated?.();

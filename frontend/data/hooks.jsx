@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getEntries, getEntryCounts, getCustomLists, getStats, getDashboardBootstrap,
-  getLibraryBootstrap, getLibraryRevision,
+  getLibraryBootstrap, getLibraryRevision, getEntryEvents,
   updateEntry, createEntry, deleteEntry, batchUpdateEntries, batchDeleteEntries,
   prefetchCoverImages,
 } from '../api.jsx';
@@ -30,6 +30,10 @@ function fetchLists() {
 }
 
 // ── Reads ──────────────────────────────────────────────────────────────────
+
+export function useEntryEvents(id, options = {}) {
+  return useQuery({ queryKey: ['entryEvents', id], queryFn: () => getEntryEvents(id), ...options });
+}
 
 export function useEntries(params, options = {}) {
   return useQuery({
@@ -217,6 +221,7 @@ function restoreSnapshot(qc, snapshot) {
 
 export function invalidateEntryData(qc) {
   qc.invalidateQueries({ queryKey: ['entries'] });
+  qc.invalidateQueries({ queryKey: ['entryEvents'] });
   qc.invalidateQueries({ queryKey: ['entryCounts'] });
   qc.invalidateQueries({ queryKey: ['customLists'] });
   qc.invalidateQueries({ queryKey: ['stats'] });

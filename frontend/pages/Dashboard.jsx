@@ -7,8 +7,8 @@ import {
   revalidateLibraryRevision,
 } from '../data/hooks.jsx';
 import { defaultLibraryParams } from '../data/keys.js';
-import { coverImgUrl, prefetchFullCover } from '../api.jsx';
-import { statusLabel, badgeClass, fmtDate, progressLabel, progressPercent, timeAgo, STATUSES, ORIGINS, logDotClass, onCoverErrorPlaceholder, tableGapVars } from '../utils.jsx';
+import { coverImgUrl, prefetchFullCover, getEntry } from '../api.jsx';
+import { statusLabel, badgeClass, fmtDate, progressLabel, progressPercent, timeAgo, describeEvent, STATUSES, ORIGINS, logDotClass, onCoverErrorPlaceholder, tableGapVars } from '../utils.jsx';
 import AddEntryModal from './components/AddEntryModal.jsx';
 import EntryDetailModal from './components/EntryDetailModal.jsx';
 import { useShare } from '../share.jsx';
@@ -128,23 +128,12 @@ export default function DashboardAlt({ onFilterChange }) {
   const loading = bootstrapQuery.isLoading;
   const error = bootstrapQuery.error?.message || '';
 
-  const activity = useMemo(() => {
-    const completedItems = dashboardData?.completed?.items ?? [];
-    const currentItems   = dashboardData?.current?.items ?? [];
-    const onHoldItems    = dashboardData?.on_hold?.items ?? [];
-    const droppedItems   = dashboardData?.dropped?.items ?? [];
-    const plannedItems   = dashboardData?.planned?.items ?? [];
-    return [
-      ...completedItems.slice(0, 6).map(e => ({ type: 'completed', entry: e, time: e.updated_at || e.completed_at })),
-      ...currentItems.slice(0, 4).map(e  => ({ type: 'current',   entry: e, time: e.created_at })),
-      ...onHoldItems.map(e               => ({ type: 'on_hold',   entry: e, time: e.updated_at })),
-      ...droppedItems.map(e              => ({ type: 'dropped',   entry: e, time: e.updated_at })),
-      ...plannedItems.map(e              => ({ type: 'planned',   entry: e, time: e.updated_at })),
-    ]
-      .filter(a => a.time)
-      .sort((a, b) => new Date(b.time) - new Date(a.time))
-      .slice(0, 8);
-  }, [dashboardData]);
+  const activity = dashboardData?.activity ?? [];
+
+  async function openActivity(event) {
+    try { setDetailEntry(await getEntry(event.entry_id)); }
+    catch (err) { alert('Could not open entry: ' + err.message); }
+  }
 
   const reload = useCallback(() => invalidateEntryData(qc), [qc]);
 
@@ -606,19 +595,14 @@ export default function DashboardAlt({ onFilterChange }) {
           ? <SkeletonActivity rows={8} />
           : activity.length === 0
           ? <div className="dash-empty-log">No recent activity.</div>
-          : activity.map((a, i) => (
-              <div key={i} className="log-entry">
-                <div className={logDotClass(a.type)} />
+          : activity.map(a => (
+              <div key={a.id} className={`log-entry${a.action === 'edited' ? ' history-event-muted' : ''}`}>
+                <div className={logDotClass(a.action === 'status' ? a.to_value : 'planned')} />
                 <div>
-                  <div className="log-text">
-                    {a.type === 'completed' ? 'Completed ' :
-                     a.type === 'current'   ? 'Started ' :
-                     a.type === 'on_hold'   ? 'Put on hold ' :
-                     a.type === 'dropped'   ? 'Dropped ' :
-                     a.type === 'planned'   ? 'Planned ' : ''}
-                    <strong>{a.entry.title}</strong>
-                  </div>
-                  <span className="log-time">{timeAgo(a.time)}</span>
+                  <button type="button" className="log-text activity-entry-link" onClick={() => openActivity(a)}>
+                    {describeEvent(a)}
+                  </button>
+                  <span className="log-time" title={new Date(a.recorded_at).toLocaleString()}>{timeAgo(a.recorded_at)}</span>
                 </div>
               </div>
             ))

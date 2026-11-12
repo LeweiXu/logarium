@@ -130,7 +130,9 @@ export async function findEntryByUrl(externalUrl) {
 }
 
 export const getEntry    = (id)        => req(`/entries/${id}`);
-export const createEntry = (data)      => req('/entries', { method: 'POST', body: JSON.stringify(data) });
+export const createEntry = (data, source = 'manual') => req(`/entries?history_source=${encodeURIComponent(source)}`, { method: 'POST', body: JSON.stringify(data) });
+export const getEntryEvents = (id) => req(`/entries/${id}/events`);
+export const getActivity = (params = {}) => req(`/activity?${new URLSearchParams(params)}`);
 export const updateEntry = (id, data)  => req(`/entries/${id}`, { method: 'PUT',  body: JSON.stringify(data) });
 export const deleteEntry = (id)        => req(`/entries/${id}`, { method: 'DELETE' });
 

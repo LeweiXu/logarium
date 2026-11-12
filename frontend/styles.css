@@ -39,3 +39,12 @@
   font-display: swap;
   src: url('/fonts/ibm-plex-mono-300-italic.woff2') format('woff2');
 }
+
+
+/* Events show when something happened; recorded time explains backdating. */
+.entry-history { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.entry-history-event { border-bottom: 1px solid var(--border); padding: 10px 0; overflow-wrap: anywhere; }
+.entry-history-event time, .entry-history-recorded { color: var(--dim); font-size: 11px; margin-right: 12px; }
+.history-event-muted { color: var(--dim); }
+.activity-entry-link { display: block; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; font: inherit; }
+.activity-entry-link:hover, .activity-entry-link:focus-visible { color: var(--accent); }

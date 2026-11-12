@@ -290,3 +290,33 @@ export function extractItems(data) {
   if (Array.isArray(data)) return data;
   return data?.items ?? data?.entries ?? data?.results ?? [];
 }
+
+
+export const VALID_EVENT_ACTIONS = [
+  'created', 'status', 'rating', 'progress', 'total', 'list', 'notes',
+  'meta', 'completed_at', 'edited',
+];
+
+export function describeEvent(event, title = '') {
+  const count = event.count || 1;
+  const subject = count > 1 ? `${count} entries` : (event.title || title || 'entry');
+  const name = <strong>{subject}</strong>;
+  const value = event.to_value;
+  switch (event.action) {
+    case 'created': return <>Added {name}</>;
+    case 'status': {
+      if (count > 1) return <>Moved {name} to {statusLabel(value)}</>;
+      const verb = { current: 'Started', completed: 'Completed', dropped: 'Dropped',
+        on_hold: 'Put on hold', planned: 'Re-planned' }[value] || 'Updated';
+      return <>{verb} {name}</>;
+    }
+    case 'rating': return value == null ? <>Cleared rating on {name}</> : <>Rated {name} {value}</>;
+    case 'progress': return <>Progress on {name}: {value ?? 'cleared'}{event.detail?.total != null ? `/${event.detail.total}` : ''}</>;
+    case 'total': return value == null ? <>Cleared length of {name}</> : <>Set length of {name} to {value}</>;
+    case 'list': return value == null ? <>Removed {name} from {event.from_value || 'list'}</> : <>Added {name} to list {value}</>;
+    case 'notes': return <>Edited notes on {name}</>;
+    case 'meta': return <>Edited {name} ({(event.detail?.fields || []).join(', ')})</>;
+    case 'completed_at': return value == null ? <>Cleared completion date on {name}</> : <>Set completion of {name} to {fmtDate(event.at)}</>;
+    default: return <>Edited {name}</>;
+  }
+}

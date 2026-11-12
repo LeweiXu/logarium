@@ -66,6 +66,10 @@ const restoredUsername = currentUsername();
 const restoredState = readSessionCache(QUERY_CACHE_AREA, restoredUsername);
 if (restoredState) {
   hydrate(queryClient, restoredState);
+  const dashboard = queryClient.getQueryData(['dashboardBootstrap']);
+  if (dashboard && !Array.isArray(dashboard.activity)) {
+    queryClient.invalidateQueries({ queryKey: ['dashboardBootstrap'] });
+  }
 }
 
 export function DataProvider({ children }) {
