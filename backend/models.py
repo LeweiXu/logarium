@@ -38,6 +38,23 @@ class User(Base):
     def __repr__(self) -> str:
         return f"<User username={self.username!r} email={self.email!r}>"
 
+class EntryEvent(Base):
+    __tablename__ = "entry_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"), nullable=False)
+    username: Mapped[str] = mapped_column(ForeignKey("users.username"), nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    from_value: Mapped[str | None] = mapped_column(String(200))
+    to_value: Mapped[str | None] = mapped_column(String(200))
+    detail: Mapped[dict | None] = mapped_column(JSON)
+    __table_args__ = (
+        Index("ix_entry_events_user_recorded", "username", "recorded_at"),
+        Index("ix_entry_events_entry_at", "entry_id", "at"),
+    )
+
+
 class Entry(Base):
     __tablename__ = "entries"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

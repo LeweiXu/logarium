@@ -131,3 +131,9 @@ def infer_source_from_url(url: str | None) -> str | None:
         if domain in url_lower:
             return source
     return None
+
+
+VALID_EVENT_ACTIONS: frozenset[str] = frozenset({
+    "created", "status", "rating", "progress", "total", "list", "notes",
+    "meta", "completed_at", "edited",
+})
