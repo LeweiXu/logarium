@@ -144,22 +144,33 @@ def get_recently_rated(
     limit: int = 20,
     visible_mediums: set[str] | None = None,
 ) -> EntryListResponse:
-    """Rated entries, most recently rated first.
+    """Rated entries, most recently moved into their current status first.
 
-    "Recently rated" is a better stand-in for "recently consumed" than
-    "recently completed": you rate a thing when you're done with it, whether or
-    not you finished it, so a dropped or on-hold entry belongs here too. Which
-    statuses to draw from is the user's choice (ui.dashboard.rated_statuses).
+    "Recently rated" stands in for "recently consumed": you rate a thing when
+    you're done with it, whether or not you finished it, so a dropped or on-hold
+    entry belongs here as much as a completed one. Which statuses to draw from
+    is the user's choice (ui.dashboard.rated_statuses).
 
-    Ordering uses when the rating was last recorded. Entries rated before the
-    history table existed have no rating event, so they fall back to their last
-    update, which is the closest thing we have for them.
+    Ordering is by when the entry entered the status it's in now, not by when it
+    was rated. Going back and rating something you dropped two years ago says
+    something about your filing, not about what you've been consuming, so it
+    shouldn't jump the list.
+
+    Entries whose current status predates the history table have no matching
+    event (the backfill only recorded creation and completion), so they fall
+    back to their last update, which is the closest thing we have for them.
     """
     from models import EntryEvent
 
-    rated_at = (
-        select(func.max(EntryEvent.recorded_at))
-        .where(EntryEvent.entry_id == Entry.id, EntryEvent.action == "rating")
+    status_at = (
+        select(EntryEvent.at)
+        .where(
+            EntryEvent.entry_id == Entry.id,
+            EntryEvent.action.in_(("created", "status")),
+            EntryEvent.to_value == Entry.status,
+        )
+        .order_by(EntryEvent.recorded_at.desc(), EntryEvent.id.desc())
+        .limit(1)
         .correlate(Entry)
         .scalar_subquery()
     )
@@ -168,7 +179,7 @@ def get_recently_rated(
     if statuses:
         q = q.where(Entry.status.in_(statuses))
     rows = db.execute(
-        q.order_by(desc(func.coalesce(rated_at, Entry.updated_at)), asc(Entry.title)).limit(limit)
+        q.order_by(desc(func.coalesce(status_at, Entry.updated_at)), asc(Entry.title)).limit(limit)
     ).scalars().all()
     return EntryListResponse(
         items=[entry_read(r) for r in rows], total=len(rows), limit=limit, offset=0,

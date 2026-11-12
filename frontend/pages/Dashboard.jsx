@@ -255,7 +255,7 @@ export default function DashboardAlt({ onFilterChange }) {
       case 'updated':
         return <td key={col} className="col-updated"><span className="col-dim">{fmtDate(e.updated_at)}</span></td>;
       case 'completed':
-        return <td key={col} className="col-completed"><span className="col-dim">{fmtDate(e.completed_at || e.updated_at)}</span></td>;
+        return <td key={col} className="col-completed"><span className="col-dim">{fmtDate(e.completed_at)}</span></td>;
       case 'progress': {
         const isEditingProg = editingProgress?.id === e.id;
         return (
