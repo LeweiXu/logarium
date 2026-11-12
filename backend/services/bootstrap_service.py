@@ -19,7 +19,10 @@ def get_dashboard_bootstrap(
         "include_total": False,
     }
     return DashboardBootstrapResponse(
-        activity=history_service.activity(db, username, visible_mediums=visible_mediums),
+        # The Dashboard log: the latest status move per entry, ten of them.
+        activity=history_service.activity(
+            db, username, limit=10, per_entry=True, visible_mediums=visible_mediums,
+        ),
         stats=get_dashboard_stats(db, username, visible_mediums),
         current=entry_service.get_entries(
             **shared, status="current", limit=20,

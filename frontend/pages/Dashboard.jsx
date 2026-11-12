@@ -128,23 +128,10 @@ export default function DashboardAlt({ onFilterChange }) {
   const loading = bootstrapQuery.isLoading;
   const error = bootstrapQuery.error?.message || '';
 
-  const activity = useMemo(() => {
-    const completedItems = dashboardData?.completed?.items ?? [];
-    const currentItems   = dashboardData?.current?.items ?? [];
-    const onHoldItems    = dashboardData?.on_hold?.items ?? [];
-    const droppedItems   = dashboardData?.dropped?.items ?? [];
-    const plannedItems   = dashboardData?.planned?.items ?? [];
-    return [
-      ...completedItems.slice(0, 6).map(e => ({ type: 'completed', entry: e, time: e.updated_at || e.completed_at })),
-      ...currentItems.slice(0, 4).map(e  => ({ type: 'current',   entry: e, time: e.created_at })),
-      ...onHoldItems.map(e               => ({ type: 'on_hold',   entry: e, time: e.updated_at })),
-      ...droppedItems.map(e              => ({ type: 'dropped',   entry: e, time: e.updated_at })),
-      ...plannedItems.map(e              => ({ type: 'planned',   entry: e, time: e.updated_at })),
-    ]
-      .filter(a => a.time)
-      .sort((a, b) => new Date(b.time) - new Date(a.time))
-      .slice(0, 8);
-  }, [dashboardData]);
+  // Straight from recorded history: the latest status move per entry, so an
+  // edit to something finished years ago no longer reads as "Completed" today.
+  // The backend already limits it to ten and to status transitions.
+  const activity = dashboardData?.activity ?? [];
 
   const reload = useCallback(() => invalidateEntryData(qc), [qc]);
 
@@ -603,22 +590,22 @@ export default function DashboardAlt({ onFilterChange }) {
 
         <p className="panel-title dashboard-activity-title">Activity Log</p>
         {loading
-          ? <SkeletonActivity rows={8} />
+          ? <SkeletonActivity rows={10} />
           : activity.length === 0
           ? <div className="dash-empty-log">No recent activity.</div>
-          : activity.map((a, i) => (
-              <div key={i} className="log-entry">
-                <div className={logDotClass(a.type)} />
+          : activity.map(a => (
+              <div key={a.id} className="log-entry">
+                <div className={logDotClass(a.to_value)} />
                 <div>
                   <div className="log-text">
-                    {a.type === 'completed' ? 'Completed ' :
-                     a.type === 'current'   ? 'Started ' :
-                     a.type === 'on_hold'   ? 'Put on hold ' :
-                     a.type === 'dropped'   ? 'Dropped ' :
-                     a.type === 'planned'   ? 'Planned ' : ''}
-                    <strong>{a.entry.title}</strong>
+                    {a.to_value === 'completed' ? 'Completed ' :
+                     a.to_value === 'current'   ? 'Started ' :
+                     a.to_value === 'on_hold'   ? 'Put on hold ' :
+                     a.to_value === 'dropped'   ? 'Dropped ' :
+                     a.to_value === 'planned'   ? 'Planned ' : ''}
+                    <strong>{a.title}</strong>
                   </div>
-                  <span className="log-time">{timeAgo(a.time)}</span>
+                  <span className="log-time">{timeAgo(a.recorded_at)}</span>
                 </div>
               </div>
             ))

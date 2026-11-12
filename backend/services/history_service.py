@@ -175,23 +175,33 @@ def entry_events(db, entry_id, username):
     ).order_by(EntryEvent.at, EntryEvent.id)).all()
 
 
-def activity(db, username, *, limit=20, exclude=(), actions=STATUS_ACTIONS, visible_mediums=None):
-    """Recent activity, newest first, with batches collapsed into one row.
+def activity(db, username, *, limit=20, exclude=(), actions=STATUS_ACTIONS,
+             per_entry=False, visible_mediums=None):
+    """Recent activity, newest first.
 
     `actions` keeps the feed to the events worth reading as a log; the Dashboard
     wants status transitions only, so that is the default. Pass actions=None for
     everything and use `exclude` to drop individual kinds.
+
+    `per_entry` gives one row per entry, its newest qualifying event, which is
+    what the Dashboard log shows: where each title stands now, not every step it
+    took to get there. Otherwise rows are per event and a batch edit collapses
+    into a single row carrying a count.
     """
     from sqlalchemy import cast, String, func, or_
     from schemas import ActivityRead
     from services.cover_cache_service import cover_cache_key
 
+    from sqlalchemy import literal
     batch = func.coalesce(EntryEvent.detail["batch"].as_string(), cast(EntryEvent.id, String))
-    groups = [batch, EntryEvent.action, EntryEvent.to_value]
+    groups = [EntryEvent.entry_id] if per_entry else [batch, EntryEvent.action, EntryEvent.to_value]
+    # One entry per row means the count is always 1; collapsing a batch instead
+    # means the row stands for however many entries shared that edit.
+    count = literal(1) if per_entry else func.count().over(partition_by=groups)
     q = select(
         EntryEvent.id.label("event_id"),
         func.row_number().over(partition_by=groups, order_by=[EntryEvent.recorded_at.desc(), EntryEvent.id.desc()]).label("position"),
-        func.count().over(partition_by=groups).label("count"),
+        count.label("count"),
     ).join(Entry, Entry.id == EntryEvent.entry_id).where(
         EntryEvent.username == username, Entry.username == username,
     )
