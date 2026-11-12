@@ -498,14 +498,20 @@ def list_duplicate_entries(
 @router.get("/activity", response_model=list[ActivityRead])
 def get_activity(
     limit: int = Query(20, ge=1, le=100),
-    exclude: str = Query("progress,meta"),
+    actions: str = Query(",".join(history_service.STATUS_ACTIONS),
+                         description="Event kinds to include; blank means all"),
+    exclude: str = Query(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(auth_service.get_current_user),
 ):
+    """Recent activity. Defaults to status transitions, which is what the
+    Dashboard's log shows."""
+    included = {v.strip() for v in actions.split(",") if v.strip()}
     excluded = {v.strip() for v in exclude.split(",") if v.strip()}
-    if excluded - VALID_EVENT_ACTIONS:
+    if (included | excluded) - VALID_EVENT_ACTIONS:
         raise HTTPException(status_code=422, detail="Unknown event action")
-    return history_service.activity(db, current_user.username, limit=limit, exclude=excluded,
+    return history_service.activity(db, current_user.username, limit=limit,
+                                    actions=included or None, exclude=excluded,
                                     visible_mediums=_visible_mediums(current_user))
 
 

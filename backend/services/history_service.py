@@ -13,6 +13,10 @@ TRACKED_FIELDS = (
     "status", "rating", "progress", "total", "custom_list", "notes",
     "title", "medium", "origin", "year", "cover_url", "external_url", "genres",
 )
+# What the Dashboard's Activity Log shows: entries appearing, and every status
+# move after that. The rest (ratings, progress, notes, metadata edits, and the
+# "edited" rows the migration backfilled) is detail, not activity.
+STATUS_ACTIONS = ("created", "status")
 FIELD_ACTION = {"custom_list": "list", **{k: k for k in ("status", "rating", "progress", "total", "notes")}}
 
 
@@ -171,7 +175,13 @@ def entry_events(db, entry_id, username):
     ).order_by(EntryEvent.at, EntryEvent.id)).all()
 
 
-def activity(db, username, *, limit=20, exclude=("progress", "meta"), visible_mediums=None):
+def activity(db, username, *, limit=20, exclude=(), actions=STATUS_ACTIONS, visible_mediums=None):
+    """Recent activity, newest first, with batches collapsed into one row.
+
+    `actions` keeps the feed to the events worth reading as a log; the Dashboard
+    wants status transitions only, so that is the default. Pass actions=None for
+    everything and use `exclude` to drop individual kinds.
+    """
     from sqlalchemy import cast, String, func, or_
     from schemas import ActivityRead
     from services.cover_cache_service import cover_cache_key
@@ -184,8 +194,11 @@ def activity(db, username, *, limit=20, exclude=("progress", "meta"), visible_me
         func.count().over(partition_by=groups).label("count"),
     ).join(Entry, Entry.id == EntryEvent.entry_id).where(
         EntryEvent.username == username, Entry.username == username,
-        EntryEvent.action.not_in(exclude),
     )
+    if actions:
+        q = q.where(EntryEvent.action.in_(actions))
+    if exclude:
+        q = q.where(EntryEvent.action.not_in(exclude))
     if visible_mediums is not None:
         q = q.where(or_(Entry.medium.is_(None), Entry.medium.in_(visible_mediums)))
     ranked = q.subquery()

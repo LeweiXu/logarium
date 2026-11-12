@@ -307,7 +307,7 @@ export function describeEvent(event, title = '') {
     case 'status': {
       if (count > 1) return <>Moved {name} to {statusLabel(value)}</>;
       const verb = { current: 'Started', completed: 'Completed', dropped: 'Dropped',
-        on_hold: 'Put on hold', planned: 'Re-planned' }[value] || 'Updated';
+        on_hold: 'Put on hold', planned: 'Planned' }[value] || 'Updated';
       return <>{verb} {name}</>;
     }
     case 'rating': return value == null ? <>Cleared rating on {name}</> : <>Rated {name} {value}</>;

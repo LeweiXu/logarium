@@ -597,7 +597,7 @@ export default function DashboardAlt({ onFilterChange }) {
           ? <div className="dash-empty-log">No recent activity.</div>
           : activity.map(a => (
               <div key={a.id} className={`log-entry${a.action === 'edited' ? ' history-event-muted' : ''}`}>
-                <div className={logDotClass(a.action === 'status' ? a.to_value : 'planned')} />
+                <div className={logDotClass(a.to_value || 'planned')} />
                 <div>
                   <button type="button" className="log-text activity-entry-link" onClick={() => openActivity(a)}>
                     {describeEvent(a)}
